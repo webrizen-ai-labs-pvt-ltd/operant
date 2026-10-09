@@ -341,9 +341,13 @@ export default function ProductTour() {
   const go = (next: Tab) => {
     const apply = () => flushSync(() => setTab(next));
     // Cross-fade with the View Transitions API where the browser has it.
-    const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
-    if (doc.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) doc.startViewTransition(apply);
-    else apply();
+    type Vt = { ready: Promise<void>; finished: Promise<void>; updateCallbackDone: Promise<void> };
+    const doc = document as Document & { startViewTransition?: (cb: () => void) => Vt };
+    if (doc.startViewTransition && !document.hidden && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      const vt = doc.startViewTransition(apply);
+      // The browser skips transitions it can't show (e.g. a hidden tab); that's fine.
+      for (const p of [vt.ready, vt.finished, vt.updateCallbackDone]) p.catch(() => {});
+    } else apply();
   };
 
   useEffect(() => {
