@@ -46,12 +46,8 @@ const jsonLd = {
     <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
   </head>
   <body class="min-h-dvh overflow-x-clip">
-    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:border focus:border-brand focus:bg-paper focus:px-4 focus:py-2">Skip to content</a>
-    <!-- Ruled columns behind the whole page. -->
-    <div class="rules pointer-events-none fixed inset-0 z-0" aria-hidden="true"></div>
-    <div class="relative z-10">
-      <slot />
-    </div>
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[60] focus:border focus:border-brand focus:bg-paper focus:px-4 focus:py-2">Skip to content</a>
+    <slot />
 
     <script>
       const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -67,23 +63,15 @@ const jsonLd = {
         },
         { rootMargin: "0px 0px -12% 0px" },
       );
-      document.querySelectorAll(".wipe, .rise").forEach((el) => io.observe(el));
+      document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
 
-      // Scroll-linked motion, read once per frame:
-      //   [data-parallax="0.2"]  moves at a different speed from the page (depth)
-      //   [data-scrub]           exposes --p (0..1): how far its section has scrolled through view
+      // [data-scrub] exposes --p (0..1): how far the element has scrolled into view.
       if (!reduced) {
-        const layers = [...document.querySelectorAll<HTMLElement>("[data-parallax]")];
         const scrubs = [...document.querySelectorAll<HTMLElement>("[data-scrub]")];
         let ticking = false;
         const update = () => {
           ticking = false;
           const vh = innerHeight;
-          for (const el of layers) {
-            const r = el.parentElement!.getBoundingClientRect();
-            const offset = r.top + r.height / 2 - vh / 2;
-            el.style.translate = `0 ${(-offset * Number(el.dataset.parallax)).toFixed(1)}px`;
-          }
           for (const el of scrubs) {
             const r = el.getBoundingClientRect();
             // 0 as the element enters at the bottom of the screen, 1 once its bottom edge is in view.

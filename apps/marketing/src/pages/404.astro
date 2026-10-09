@@ -6,13 +6,12 @@ import Base from "../layouts/Base.astro";
 
 <Base title="Page not found">
   <Nav />
-  <main id="main" class="grain relative flex min-h-[80dvh] items-center justify-center overflow-hidden px-5 pt-24 text-center">
-    <div class="grid-bg pointer-events-none absolute inset-0" aria-hidden="true"></div>
-    <div class="relative">
-      <p class="eyebrow">404</p>
-      <h1 class="display mt-4 text-[clamp(2.4rem,6vw,4.5rem)]">This page doesn't exist.</h1>
-      <p class="mt-4 text-lg text-ink-2">It may have moved, or the link has a typo.</p>
-      <a href="/" class="btn-brand mt-8 inline-block rounded-full px-6 py-3 font-semibold">Back to the home page</a>
+  <main id="main" class="flex min-h-[70dvh] items-center justify-center px-5 pt-24 text-center">
+    <div>
+      <p class="kicker">404</p>
+      <h1 class="h2 mt-3">This page doesn't exist.</h1>
+      <p class="body-lg mt-3">It may have moved, or the link has a typo.</p>
+      <a href="/" class="btn btn-primary mt-8">Back to the home page</a>
     </div>
   </main>
   <Footer />

@@ -75,7 +75,7 @@ function Gst() {
       </div>
 
       <div className=" border border-line bg-paper-2 p-5" aria-live="polite">
-        <div className="eyebrow">{supply === "intra" ? "Same state: CGST + SGST" : "Different states: IGST"}</div>
+        <div className="kicker">{supply === "intra" ? "Same state: CGST + SGST" : "Different states: IGST"}</div>
         <dl className="mt-4 space-y-2 font-mono text-sm">
           <div className="flex justify-between">
             <dt className="font-sans text-ink-3">Taxable value</dt>
@@ -157,7 +157,7 @@ function Emi() {
           <>
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
-                <div className="eyebrow">Each instalment</div>
+                <div className="kicker">Each instalment</div>
                 <div className="mt-1 font-mono text-2xl font-semibold">{inr(s.emi)}</div>
               </div>
               <div className="text-right text-xs text-ink-3">

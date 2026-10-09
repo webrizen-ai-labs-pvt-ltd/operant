@@ -374,7 +374,7 @@ export default function ProductTour() {
                 setAuto(false);
                 go(t.key);
               }}
-              className={`relative flex shrink-0 items-center gap-2 overflow-hidden border-r border-line px-5 py-3 font-mono text-xs tracking-wide uppercase transition ${active ? "bg-brand text-[#09090b]" : "text-ink-3 hover:bg-card hover:text-ink"}`}
+              className={`relative flex shrink-0 items-center gap-2 overflow-hidden border-r border-line px-4 py-2.5 text-sm font-medium transition ${active ? "bg-brand text-[#09090b]" : "text-ink-3 hover:bg-card hover:text-ink"}`}
             >
               <Dot c={t.color} />
               {t.label}

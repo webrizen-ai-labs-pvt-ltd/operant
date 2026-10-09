@@ -52,8 +52,8 @@ void main() {
   vec3 orange = vec3(0.957, 0.376, 0.212);
   vec3 gold = vec3(1.0, 0.74, 0.42);
   vec3 col = vec3(0.0);
-  float open = 1.0 + S * 0.85;
-  float speed = 1.0 + S * 4.0;
+  float open = 1.0 + S * 0.25;
+  float speed = 1.0 + S * 2.0;
 
   // ---- Ten rings ----
   for (int i = 0; i < 10; i++) {
@@ -92,7 +92,7 @@ void main() {
     }
     // Inner rings burn gold, outer ones orange; outermost fade out.
     vec3 c = mix(gold, orange, smoothstep(0.1, 0.5, r));
-    col += c * v * (1.0 - fi * 0.055);
+    col += c * v * (0.75 - fi * 0.045);
   }
 
   // ---- Core frame: spokes, a turning star of two triangles, the glow ----
@@ -113,9 +113,9 @@ void main() {
   // Aura: turbulent fire around the core, and a faint halo at the outer rings.
   float n = fbm(vec2(a * 1.6 + T * 0.04, r * 7.0 - T * 0.35 * speed));
   float aura = exp(-pow(max(r - 0.02, 0.0) * 3.4, 1.35)) * (0.25 + 0.75 * n);
-  col += orange * aura * 0.85;
-  col += gold * exp(-r * 22.0) * 1.4;
-  float halo = exp(-abs(r - 0.6 * open) * 10.0) * fbm(vec2(a * 3.0 - T * 0.03, T * 0.1)) * 0.28;
+  col += orange * aura * 0.45;
+  col += gold * exp(-r * 24.0) * 1.0;
+  float halo = exp(-abs(r - 0.6 * open) * 10.0) * fbm(vec2(a * 3.0 - T * 0.03, T * 0.1)) * 0.12;
   col += orange * halo;
 
   // Sparks spiralling outwards.
@@ -124,9 +124,10 @@ void main() {
   float spark = step(0.988, h2(id)) * (1.0 - smoothstep(0.0, 0.16, length(fract(g) - 0.5)));
   col += vec3(1.0, 0.85, 0.7) * spark * smoothstep(0.7, 0.12, r) * (0.6 + 0.4 * sin(T * 3.0 + h2(id) * 40.0));
 
-  // Tone, fade with scroll, and sit on zinc-950.
-  col = 1.0 - exp(-col * 1.35);
-  col *= 1.0 - S * 0.55;
+  // Tone, fade at the edges of the square so it melts into the page, and sit on zinc-950.
+  col = 1.0 - exp(-col * 1.25);
+  col *= 1.0 - smoothstep(0.36, 0.5, length(uv));
+  col *= 1.0 - S * 0.4;
   col += vec3(0.035, 0.035, 0.043);
   col += (h2(gl_FragCoord.xy + fract(T)) - 0.5) / 255.0;
   outColor = vec4(col, 1.0);
@@ -165,7 +166,7 @@ export function mountRings(canvas: HTMLCanvasElement, host: HTMLElement) {
   const uR = u("R"), uT = u("T"), uM = u("M"), uS = u("S"), uC = u("C"), uZ = u("Z");
 
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.25);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
   let w = 0;
   let h = 0;
   const resize = () => {
@@ -193,12 +194,10 @@ export function mountRings(canvas: HTMLCanvasElement, host: HTMLElement) {
   }
 
   const draw = (t: number) => {
-    const aspect = w / h;
-    const wide = aspect > 1.15;
-    // Rings sit to the right of the headline on wide screens, above it on phones.
-    const cx = wide ? aspect * 0.25 : 0;
-    const cy = wide ? -0.02 : 0.24;
-    const z = wide ? 0.74 : 0.7;
+    // The emblem fills its own square canvas.
+    const cx = 0;
+    const cy = 0;
+    const z = 0.78;
     mouse.x += (target.x - mouse.x) * 0.05;
     mouse.y += (target.y - mouse.y) * 0.05;
     const s = Math.min(1, Math.max(0, -host.getBoundingClientRect().top / host.offsetHeight));

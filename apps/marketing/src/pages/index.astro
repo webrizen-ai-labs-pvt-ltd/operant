@@ -1,4 +1,23 @@
 ---
+import {
+  ArrowRight,
+  Banknote,
+  BellRing,
+  Check,
+  FileText,
+  FolderKanban,
+  Globe,
+  KeyRound,
+  Lock,
+  Mail,
+  MapPin,
+  MessagesSquare,
+  PieChart,
+  ScrollText,
+  Split,
+  UserCheck,
+  Users,
+} from "lucide-react";
 import Footer from "../components/Footer.astro";
 import Nav from "../components/Nav.astro";
 import Calculators from "../islands/Calculators.tsx";
@@ -6,67 +25,37 @@ import ProductTour from "../islands/ProductTour.tsx";
 import Base from "../layouts/Base.astro";
 import { demoUrl, signUpUrl } from "../site";
 
-const audiences = ["CA and CS firms", "Design studios", "Consultancies", "Law practices", "Digital agencies", "Architects", "IT services", "Clinics", "Training institutes", "Event companies"];
-
 const areas = [
-  {
-    n: "01",
-    name: "People",
-    color: "var(--people)",
-    line: "Everyone, their manager, their leave and their first week.",
-    points: ["Directory and org chart", "Leave with approvals", "Team calendar", "Onboarding checklists"],
-    shape: "circle",
-  },
-  {
-    n: "02",
-    name: "Work",
-    color: "var(--work)",
-    line: "Projects your team can actually follow.",
-    points: ["Boards, lists, calendar", "Milestones and goals", "Repeating work", "Templates per service"],
-    shape: "square",
-  },
-  {
-    n: "03",
-    name: "Collaboration",
-    color: "var(--collab)",
-    line: "Talk about the work where the work is.",
-    points: ["Channels and direct messages", "Comments on anything", "@mentions", "Decisions you can find"],
-    shape: "triangle",
-  },
-  {
-    n: "04",
-    name: "Finance",
-    color: "var(--finance)",
-    line: "GST invoices to money in the bank.",
-    points: ["Quotes, invoices, credit notes", "CGST, SGST, IGST done for you", "Pay links and reminders", "Receivables by age"],
-    shape: "hexagon",
-  },
+  { name: "People", icon: Users, color: "var(--people)", line: "Your team, their managers, leave and onboarding.", points: ["Directory and org chart", "Leave with approvals and a team calendar", "Onboarding checklists"] },
+  { name: "Work", icon: FolderKanban, color: "var(--work)", line: "Projects your team can actually follow.", points: ["Boards, lists, calendar and milestones", "Repeating work and templates", "Goals and workload"] },
+  { name: "Collaboration", icon: MessagesSquare, color: "var(--collab)", line: "Talk about the work where the work is.", points: ["Channels and direct messages", "Comments on tasks, projects and invoices", "Decisions that are easy to find"] },
+  { name: "Finance", icon: Banknote, color: "var(--finance)", line: "GST invoices to money in the bank.", points: ["Quotes, invoices and credit notes", "Online payments and reminders", "Receivables by client and by age"] },
 ];
 
 const finance = [
-  ["GST without the arithmetic", "CGST and SGST or IGST from your state and your client's. HSN/SAC codes, gap-free numbering per financial year, amounts in words."],
-  ["Instalments with interest", "Split an invoice into EMIs on the reducing balance. Each instalment's interest is billed on its own GST invoice."],
-  ["Payments that chase themselves", "Razorpay links on every invoice. A reminder the day after it's due, then weekly, until it's paid."],
-  ["Know who owes what", "Billed, collected and due each month; what's owed by client and by age; who paid recently."],
-  ["From your own address", "Invoices come from accounts@yourfirm.in: verify your domain, or connect Gmail, Microsoft 365 or Zoho."],
-  ["Not registered for GST?", "Leave GSTIN blank and invoices go out without GST. Add it the day you register."],
+  { icon: FileText, title: "GST worked out for you", text: "CGST and SGST or IGST from your state and your client's, HSN/SAC codes, and gap-free numbering for each financial year." },
+  { icon: Split, title: "Instalments with interest", text: "Split an invoice into EMIs on the reducing balance. Each instalment's interest gets its own GST invoice." },
+  { icon: BellRing, title: "Payments that follow up", text: "Razorpay links on every invoice, and a polite reminder the day after it's due, then weekly." },
+  { icon: PieChart, title: "Know who owes what", text: "Billed, collected and due each month, and what's owed by client and by age." },
+  { icon: Mail, title: "From your own address", text: "Invoices come from accounts@yourfirm.in. Verify your domain, or connect Gmail, Microsoft 365 or Zoho." },
+  { icon: Check, title: "Not GST-registered?", text: "Leave GSTIN blank and invoices go out without GST. Add it the day you register." },
 ];
 
-const story = [
-  ["Request", "A client picks a service in your portal and uploads what you ask for."],
-  ["Quote", "You talk it through and send a quote. They accept it in the portal."],
-  ["Project", "Work starts from a template, with the conversation attached."],
-  ["Invoice", "A finished milestone drafts its own GST invoice."],
-  ["Paid", "They pay online, or in instalments. Reminders stop on their own."],
+const steps = [
+  ["A client asks", "They pick a service in your portal and upload what you ask for."],
+  ["You agree the work", "Talk it through and send a quote. They accept it in the portal."],
+  ["Work starts", "A project is created from your template, with the conversation attached."],
+  ["Milestones bill", "A finished milestone drafts its GST invoice, ready to send."],
+  ["You get paid", "They pay online, or in instalments. Reminders stop on their own."],
 ];
 
 const trust = [
-  ["One sign-in, with roles", "People sign in with their Webrizen account. Roles decide who sees Finance, approves leave or changes settings."],
-  ["Audit log", "Who issued an invoice, voided a payment or changed a setting, and when."],
-  ["Secrets stay secret", "Payment gateway keys and mail server passwords are encrypted and never shown again."],
-  ["Hosted in India", "Your data lives on servers in Mumbai."],
-  ["Clients see only theirs", "Each client sees their own requests, projects, documents and invoices. Nothing else."],
-  ["Nothing to install", "In any browser, on your laptop or your phone."],
+  { icon: KeyRound, title: "One sign-in, with roles", text: "People sign in with their Webrizen account. Roles decide who sees Finance or changes settings." },
+  { icon: ScrollText, title: "Audit log", text: "Who issued an invoice, voided a payment or changed a setting, and when." },
+  { icon: Lock, title: "Secrets stay secret", text: "Payment and mail server passwords are encrypted and never shown again." },
+  { icon: MapPin, title: "Hosted in India", text: "Your data lives on servers in Mumbai." },
+  { icon: UserCheck, title: "Clients see only theirs", text: "Each client sees their own requests, documents and invoices. Nothing else." },
+  { icon: Globe, title: "Nothing to install", text: "Works in any browser, on a laptop or a phone." },
 ];
 
 const faqs = [
@@ -76,111 +65,73 @@ const faqs = [
   ["Can clients pay online?", "Yes. Connect your Razorpay account and every invoice, or every instalment, gets a pay link. Payments are recorded automatically."],
   ["Can emails come from our own address?", "Yes. Verify your domain with a few DNS records, or connect your mail server. Until then emails go out with your name and replies come to you."],
   ["Can we switch off what we don't need?", "Yes. Turn off People, Work, Collaboration or Finance for the whole organization and they disappear from everyone's screen."],
-  ["Where is our data kept?", "On servers in India (Mumbai). Payment gateway and mail server passwords are encrypted, and the audit log records who changed what."],
 ];
-
-// Outline glyphs for the four areas.
-const shapes: Record<string, string> = {
-  circle: '<circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="24"/><path d="M50 4v16M50 80v16M4 50h16M80 50h16"/>',
-  square: '<rect x="14" y="14" width="72" height="72"/><rect x="30" y="30" width="40" height="40" transform="rotate(45 50 50)"/><path d="M14 14l72 72M86 14L14 86"/>',
-  triangle: '<path d="M50 8L92 84H8z"/><path d="M50 92L8 16h84z" opacity=".55"/><circle cx="50" cy="50" r="10"/>',
-  hexagon: '<path d="M50 6l38 22v44L50 94 12 72V28z"/><path d="M50 26l21 12v24L50 74 29 62V38z"/><path d="M50 6v20M88 28L71 38M88 72L71 62M50 94V74M12 72l17-10M12 28l17 10"/>',
-};
 ---
 
 <Base>
   <Nav />
   <main id="main">
-    <!-- ================= HERO ================= -->
-    <section id="hero" class="relative min-h-[100svh] overflow-hidden border-b border-line">
-      <!-- Static rings, shown until (or instead of) the WebGL ones. -->
-      <svg class="absolute top-1/2 left-1/2 h-[120vmin] w-[120vmin] -translate-y-1/2 text-brand/40 max-lg:top-[34%] max-lg:-translate-x-1/2 lg:left-[62%]" viewBox="-100 -100 200 200" fill="none" stroke="currentColor" aria-hidden="true">
-        {Array.from({ length: 10 }, (_, i) => <circle r={14 + i * 7.6} stroke-width="0.15" stroke-dasharray={i % 2 ? "0.6 1.4" : undefined} />)}
-      </svg>
-      <canvas id="rings" class="absolute inset-0 size-full opacity-0 transition-opacity duration-[1.6s] data-[ready]:opacity-100" aria-hidden="true"></canvas>
-      <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_left,var(--paper)_10%,transparent_60%)] max-lg:bg-[linear-gradient(to_top,var(--paper)_35%,transparent_75%)]" aria-hidden="true"></div>
-
-      <div class="relative mx-auto flex min-h-[100svh] max-w-[1440px] flex-col justify-end px-5 pt-28 pb-10 sm:px-8 lg:justify-center">
-        <p class="label fade-in" style="--d:.1s">
-          <span class="label-brand">Operant</span> / For firms that serve clients / Made in India <span class="blink text-brand">▍</span>
-        </p>
-        <h1 class="display mt-6 text-[clamp(3.2rem,9vw,8.6rem)]">
-          <span class="line-mask"><span style="--i:0">Your team.</span></span>
-          <span class="line-mask"><span style="--i:1">Your work.</span></span>
-          <span class="line-mask"><span style="--i:2">Your money.</span></span>
-          <span class="line-mask"><span style="--i:3" class="text-brand">One place.</span></span>
-        </h1>
-        <p class="lede fade-in mt-8 max-w-xl text-lg text-ink-2" style="--d:.9s">
-          Operant brings your people, projects, team chat, GST invoicing and a client portal together, so nothing lives in a spreadsheet, a WhatsApp group or someone's head.
-        </p>
-        <div class="fade-in mt-9 flex flex-wrap gap-3" style="--d:1.05s">
-          <a href={signUpUrl} class="btn btn-solid">Get started <span class="arrow" aria-hidden="true">→</span></a>
-          <a href={demoUrl} class="btn">Book a demo</a>
+    <!-- ================= Hero ================= -->
+    <section id="hero" class="relative overflow-hidden">
+      <div class="mx-auto grid max-w-[1200px] items-center gap-10 px-5 pt-32 pb-20 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:pt-36 lg:pb-24">
+        <div>
+          <a href="#how" class="intro inline-flex items-center gap-2 border border-line px-3 py-1.5 text-xs text-ink-2 transition-colors hover:border-line-2 hover:text-ink">
+            <span class="bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-[#09090b]">New</span>
+            A portal where your clients request work and pay
+            <ArrowRight size={13} />
+          </a>
+          <h1 class="h1 intro mt-7" style="--i:1">
+            Your team, your work and your money. <span class="text-brand">In one place.</span>
+          </h1>
+          <p class="body-lg intro mt-6 max-w-xl" style="--i:2">
+            Operant brings your people, projects, team chat, GST invoicing and a client portal together, so nothing lives in a spreadsheet, a WhatsApp group or someone's head.
+          </p>
+          <div class="intro mt-9 flex flex-wrap gap-3" style="--i:3">
+            <a href={signUpUrl} class="btn btn-primary">Get started <span class="arrow" aria-hidden="true">→</span></a>
+            <a href={demoUrl} class="btn">Book a demo</a>
+          </div>
+          <ul class="intro mt-10 flex flex-wrap gap-x-6 gap-y-2 text-sm text-ink-3" style="--i:4">
+            {["GST-ready invoicing", "A portal for your clients", "Sign in with Webrizen"].map((t) => (
+              <li class="flex items-center gap-2"><Check size={14} color="var(--brand)" /> {t}</li>
+            ))}
+          </ul>
         </div>
 
-        <div class="fade-in mt-16 grid grid-cols-2 border-t border-line font-mono text-[11px] text-ink-3 sm:grid-cols-4" style="--d:1.3s">
-          {
-            areas.map((a, i) => (
-              <div class={`flex items-center gap-2 py-3 ${i ? "sm:border-l sm:border-line sm:pl-4" : ""} ${i % 2 ? "max-sm:border-l max-sm:border-line max-sm:pl-4" : ""}`}>
-                <span class="size-1.5" style={`background:${a.color}`} />
-                {a.n} {a.name}
-              </div>
-            ))
-          }
+        <!-- The emblem: WebGL rings, with static SVG rings until (or instead of) WebGL. -->
+        <div class="relative mx-auto aspect-square w-full max-w-[460px]" aria-hidden="true">
+          <svg class="absolute inset-[8%] text-brand/35" viewBox="-100 -100 200 200" fill="none" stroke="currentColor">
+            {Array.from({ length: 10 }, (_, i) => <circle r={12 + i * 8.5} stroke-width="0.35" stroke-dasharray={i % 2 ? "1 2.5" : undefined} />)}
+          </svg>
+          <canvas id="rings" class="absolute inset-0 size-full opacity-0 transition-opacity duration-1000 data-[ready]:opacity-100"></canvas>
         </div>
-      </div>
-      <div class="absolute right-8 bottom-10 hidden font-mono text-[10px] text-ink-3 lg:block" aria-hidden="true">19.0760° N · 72.8777° E</div>
-    </section>
-
-    <!-- ================= TICKER ================= -->
-    <section class="ticker overflow-hidden border-b border-line py-5" aria-label="Who it's for">
-      <div class="ticker-track flex w-max gap-8 pr-8 font-mono text-sm uppercase tracking-[0.12em] text-ink-3">
-        {
-          [...audiences, ...audiences].map((a, i) => (
-            <span class="flex items-center gap-8 whitespace-nowrap" aria-hidden={i >= audiences.length ? "true" : undefined}>
-              {a} <span class="text-brand">◆</span>
-            </span>
-          ))
-        }
       </div>
     </section>
 
-    <!-- ================= THE SYSTEM ================= -->
-    <section id="system" class="relative">
-      <div class="mx-auto max-w-[1440px] border-x border-line">
-        <div class="grid border-b border-line lg:grid-cols-12">
-          <div class="border-line p-8 lg:col-span-4 lg:border-r">
-            <p class="label"><span class="label-brand">01</span> / The system</p>
-          </div>
-          <div class="p-8 lg:col-span-8">
-            <h2 class="display wipe text-[clamp(2.4rem,5.4vw,5.2rem)]">Four areas.<br /><span class="text-ink-3">One record of everything.</span></h2>
-            <p class="lede rise mt-8 max-w-2xl text-lg text-ink-2">
-              Leave in one place, tasks in another, invoices in a third and client files somewhere in chat. Operant connects them: a client request becomes a project, a finished milestone becomes an invoice, an approved leave shows on everyone's calendar.
-            </p>
-          </div>
+    <!-- ================= Product ================= -->
+    <section id="product" class="border-t border-line">
+      <div class="mx-auto max-w-[1200px] px-5 py-24 sm:px-8">
+        <div class="reveal max-w-2xl">
+          <p class="kicker">A look inside</p>
+          <h2 class="h2 mt-3">Everything your firm runs on, connected.</h2>
+          <p class="body-lg mt-4">A client request becomes a project, a finished milestone becomes an invoice, and an approved leave shows on everyone's calendar. Pick an area below, or let it run.</p>
+        </div>
+        <div class="reveal beam mt-12" style="--i:1">
+          <ProductTour client:visible />
         </div>
 
-        <div class="grid sm:grid-cols-2 xl:grid-cols-4">
+        <div class="mt-16 grid border-t border-l border-line sm:grid-cols-2 lg:grid-cols-4">
           {
             areas.map((a, i) => (
-              <article class={`group relative overflow-hidden border-line p-8 transition-colors hover:bg-card ${i ? "max-sm:border-t sm:border-l" : ""} ${i === 2 ? "sm:max-xl:border-l-0 sm:max-xl:border-t" : ""} ${i === 3 ? "sm:max-xl:border-t" : ""}`}>
-                <span class="absolute inset-x-0 top-0 h-px origin-left scale-x-0 transition-transform duration-500 group-hover:scale-x-100" style={`background:${a.color}`} />
-                <div class="flex items-start justify-between">
-                  <span class="font-mono text-xs text-ink-3">{a.n}</span>
-                  <span class="font-mono text-xs" style={`color:${a.color}`}>
-                    {a.name}
-                  </span>
-                </div>
-                <div class="relative my-10 flex h-40 items-center justify-center">
-                  <div data-parallax={(0.04 + i * 0.03).toFixed(2)}>
-                    <svg viewBox="0 0 100 100" class={`size-36 ${i % 2 ? "spin-rev" : "spin-slow"}`} fill="none" stroke={a.color} stroke-width="0.6" set:html={shapes[a.shape]} aria-hidden="true" />
-                  </div>
-                </div>
-                <h3 class="text-xl font-semibold tracking-tight">{a.line}</h3>
-                <ul class="mt-6 divide-y divide-line border-y border-line text-sm text-ink-2">
+              <article class="reveal accent-top border-r border-b border-line p-6 transition-colors hover:bg-card" style={`--accent:${a.color};--i:${i}`}>
+                <span class="flex size-9 items-center justify-center border border-line-2">
+                  <a.icon size={17} strokeWidth={1.6} color={a.color} />
+                </span>
+                <h3 class="h3 mt-5">{a.name}</h3>
+                <p class="mt-1.5 text-sm text-ink-2">{a.line}</p>
+                <ul class="mt-5 space-y-2 border-t border-line pt-5 text-sm text-ink-2">
                   {a.points.map((p) => (
-                    <li class="flex items-center gap-3 py-2.5">
-                      <span class="size-1" style={`background:${a.color}`} />
+                    <li class="flex gap-2.5">
+                      <Check size={14} color={a.color} class="mt-1 shrink-0" />
                       {p}
                     </li>
                   ))}
@@ -192,90 +143,67 @@ const shapes: Record<string, string> = {
       </div>
     </section>
 
-    <!-- ================= INSIDE (product tour) ================= -->
-    <section class="relative border-y border-line">
-      <div class="grid-fine absolute inset-0" aria-hidden="true"></div>
-      <div class="relative mx-auto max-w-[1440px] border-x border-line px-5 py-24 sm:px-8">
-        <div class="mb-12 flex flex-wrap items-end justify-between gap-6">
+    <!-- ================= Finance ================= -->
+    <section id="finance" class="border-t border-line">
+      <div class="mx-auto max-w-[1200px] px-5 py-24 sm:px-8">
+        <div class="reveal grid gap-6 lg:grid-cols-2 lg:items-end">
           <div>
-            <p class="label"><span class="label-brand">02</span> / Inside</p>
-            <h2 class="display wipe mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)]">See it working.</h2>
+            <p class="kicker">Finance</p>
+            <h2 class="h2 mt-3">Invoices your accountant will like.</h2>
           </div>
-          <p class="max-w-sm text-ink-2">A live look at Operant, built in the page rather than screenshots. Pick an area, or let it run.</p>
+          <p class="body-lg">Made for how business works in India: GST, financial years, UPI and bank transfers, and clients who need a nudge to pay.</p>
         </div>
-        <div class="ticks wipe">
-          <ProductTour client:visible />
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= FINANCE ================= -->
-    <section id="finance" class="relative overflow-hidden">
-      <div class="mx-auto grid max-w-[1440px] border-x border-line lg:grid-cols-12">
-        <div class="relative border-b border-line p-8 lg:col-span-5 lg:border-r lg:border-b-0">
-          <div class="lg:sticky lg:top-24">
-            <p class="label"><span class="label-brand">03</span> / Finance</p>
-            <h2 class="display wipe mt-5 text-[clamp(2.2rem,4.2vw,4rem)]">Invoices your accountant will like.</h2>
-            <!-- A giant figure: outlined, filling with orange from the bottom as you scroll. -->
-            <div class="relative mt-10 select-none" data-scrub aria-hidden="true">
-              <div class="outline-text text-[clamp(8rem,20vw,17rem)] leading-[0.8] font-semibold tracking-[-0.07em]">18%</div>
-              <div class="absolute inset-0 text-[clamp(8rem,20vw,17rem)] leading-[0.8] font-semibold tracking-[-0.07em] text-brand" style="clip-path: inset(calc(100% - var(--p, 0) * 100%) 0 0 0)">18%</div>
-            </div>
-            <p class="mt-6 font-mono text-xs text-ink-3">CGST 9% + SGST 9% · or IGST 18% · worked out for you</p>
-          </div>
-        </div>
-        <div class="lg:col-span-7">
+        <div class="mt-12 grid border-t border-l border-line md:grid-cols-2 lg:grid-cols-3">
           {
-            finance.map(([t, d], i) => (
-              <div class={`rise group relative grid grid-cols-[3.5rem_1fr] border-line p-8 transition-colors hover:bg-card ${i ? "border-t" : ""}`} style={`--i:${i % 3}`}>
-                <span class="absolute inset-y-0 left-0 w-px origin-top scale-y-0 bg-brand transition-transform duration-500 group-hover:scale-y-100" />
-                <span class="font-mono text-xs text-ink-3">{String(i + 1).padStart(2, "0")}</span>
-                <div>
-                  <h3 class="text-xl font-semibold tracking-tight">{t}</h3>
-                  <p class="mt-2 max-w-lg text-ink-2">{d}</p>
-                </div>
+            finance.map((f, i) => (
+              <div class="reveal accent-top border-r border-b border-line p-6 transition-colors hover:bg-card" style={`--i:${i % 3}`}>
+                <f.icon size={18} strokeWidth={1.6} color="var(--brand)" />
+                <h3 class="h3 mt-4">{f.title}</h3>
+                <p class="mt-2 text-sm text-ink-2">{f.text}</p>
               </div>
             ))
           }
         </div>
+
+        <div id="try" class="mt-20 scroll-mt-24">
+          <div class="reveal max-w-2xl">
+            <p class="kicker">Try it</p>
+            <h3 class="h2 mt-3 !text-[clamp(1.6rem,2.4vw,2.1rem)]">The same maths as your invoices.</h3>
+            <p class="body-lg mt-3">These calculators run the exact code Operant uses on real invoices.</p>
+          </div>
+          <div class="reveal mt-8" style="--i:1">
+            <Calculators client:visible />
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- ================= REQUEST TO PAID ================= -->
-    <section id="portal" class="relative border-y border-line">
-      <div class="mx-auto max-w-[1440px] border-x border-line">
-        <div class="grid border-b border-line lg:grid-cols-12">
-          <div class="p-8 lg:col-span-4 lg:border-r lg:border-line">
-            <p class="label"><span class="label-brand">04</span> / The client portal</p>
-          </div>
-          <div class="p-8 lg:col-span-8">
-            <h2 class="display wipe text-[clamp(2.2rem,4.6vw,4.4rem)]">From a client's request to money in the bank.</h2>
-            <p class="lede rise mt-6 max-w-2xl text-lg text-ink-2">Your clients get their own site: no passwords, just a code by email. They see your team's names and faces, never your internal chat.</p>
-          </div>
+    <!-- ================= How it works ================= -->
+    <section id="how" class="border-t border-line">
+      <div class="mx-auto max-w-[1200px] px-5 py-24 sm:px-8">
+        <div class="reveal max-w-2xl">
+          <p class="kicker">The client portal</p>
+          <h2 class="h2 mt-3">From a client's request to money in the bank.</h2>
+          <p class="body-lg mt-4">Your clients get their own simple site: no passwords, just a code by email. They see your team's names and faces, never your internal chat.</p>
         </div>
 
-        <!-- The line draws itself as you scroll; each step lights up when the line reaches it. -->
-        <div class="relative px-8 pt-16 pb-20" data-scrub>
-          <svg class="absolute top-[4.6rem] left-8 hidden h-6 w-[calc(100%-4rem)] lg:block" viewBox="0 0 1000 24" preserveAspectRatio="none" fill="none" aria-hidden="true">
-            <path d="M0 12H1000" stroke="var(--line-2)" stroke-width="1" vector-effect="non-scaling-stroke"></path>
-            <path d="M0 12H1000" stroke="var(--brand)" stroke-width="2" vector-effect="non-scaling-stroke" pathLength="1" stroke-dasharray="1" style="stroke-dashoffset: calc(1 - var(--p, 0))"></path>
-          </svg>
-          <ol class="relative grid gap-12 lg:grid-cols-5 lg:gap-6">
+        <!-- A thin line that fills as you scroll; each step lights up as it's reached. -->
+        <div class="relative mt-14" data-scrub>
+          <div class="absolute top-4 right-0 left-0 hidden h-px bg-line lg:block" aria-hidden="true">
+            <div class="h-full origin-left bg-brand" style="transform: scaleX(var(--p, 0))"></div>
+          </div>
+          <ol class="relative grid gap-8 lg:grid-cols-5 lg:gap-6">
             {
-              story.map(([t, d], i) => (
-                <li class="relative max-lg:border-l max-lg:border-line max-lg:pl-6" style={`--on: clamp(0, (var(--p, 0) - ${(i / 5).toFixed(2)}) * 12, 1)`}>
+              steps.map(([t, d], i) => (
+                <li class="relative max-lg:border-l max-lg:border-line max-lg:pl-6" style={`--on: clamp(0, (var(--p, 0) - ${(i / 5).toFixed(2)}) * 10, 1)`}>
                   <span
-                    class="flex size-7 items-center justify-center border font-mono text-[11px] max-lg:absolute max-lg:-left-3.5"
+                    class="flex size-8 items-center justify-center border text-xs font-semibold max-lg:absolute max-lg:-left-4"
                     style="border-color: color-mix(in oklab, var(--brand) calc(var(--on) * 100%), var(--line-2)); background: color-mix(in oklab, var(--brand) calc(var(--on) * 100%), var(--paper)); color: color-mix(in oklab, #09090b calc(var(--on) * 100%), var(--ink-3))"
                   >
                     {i + 1}
                   </span>
-                  <h3 class="mt-8 text-2xl font-semibold tracking-tight max-lg:mt-0" style="opacity: calc(0.35 + var(--on) * 0.65)">
-                    {t}
-                  </h3>
-                  <p class="mt-2 text-ink-2" style="opacity: calc(0.35 + var(--on) * 0.65)">
-                    {d}
-                  </p>
+                  <h3 class="h3 mt-5 max-lg:mt-0">{t}</h3>
+                  <p class="mt-1.5 text-sm text-ink-2">{d}</p>
                 </li>
               ))
             }
@@ -284,36 +212,22 @@ const shapes: Record<string, string> = {
       </div>
     </section>
 
-    <!-- ================= TRY IT ================= -->
-    <section id="try" class="relative">
-      <div class="mx-auto max-w-[1440px] border-x border-line px-5 py-24 sm:px-8">
-        <div class="mb-12 grid gap-6 lg:grid-cols-12">
-          <div class="lg:col-span-5">
-            <p class="label"><span class="label-brand">05</span> / Try it</p>
-            <h2 class="display wipe mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)]">The same maths as your invoices.</h2>
-          </div>
-          <p class="self-end text-lg text-ink-2 lg:col-span-6 lg:col-start-7">These calculators run the exact code Operant uses on real invoices. Change the numbers.</p>
+    <!-- ================= Trust ================= -->
+    <section class="border-t border-line">
+      <div class="mx-auto max-w-[1200px] px-5 py-24 sm:px-8">
+        <div class="reveal max-w-2xl">
+          <p class="kicker">Built to be trusted</p>
+          <h2 class="h2 mt-3">Your data, your rules.</h2>
         </div>
-        <div class="ticks">
-          <Calculators client:visible />
-        </div>
-      </div>
-    </section>
-
-    <!-- ================= TRUST ================= -->
-    <section class="border-y border-line">
-      <div class="mx-auto max-w-[1440px] border-x border-line">
-        <div class="border-b border-line p-8">
-          <p class="label"><span class="label-brand">06</span> / Trust</p>
-          <h2 class="display wipe mt-5 text-[clamp(2.2rem,4.6vw,4.2rem)]">Your data, your rules.</h2>
-        </div>
-        <div class="grid sm:grid-cols-2 lg:grid-cols-3">
+        <div class="mt-12 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">
           {
-            trust.map(([t, d], i) => (
-              <div class={`rise border-line p-8 ${i % 3 ? "lg:border-l" : ""} ${i % 2 ? "sm:max-lg:border-l" : ""} ${i >= 3 ? "lg:border-t" : ""} ${i >= 2 ? "sm:max-lg:border-t" : ""} ${i ? "max-sm:border-t" : ""}`} style={`--i:${i % 3}`}>
-                <span class="font-mono text-xs text-brand">{String(i + 1).padStart(2, "0")}</span>
-                <h3 class="mt-4 text-lg font-semibold">{t}</h3>
-                <p class="mt-2 text-sm text-ink-2">{d}</p>
+            trust.map((t, i) => (
+              <div class="reveal flex gap-4 border-t border-line pt-6" style={`--i:${i % 3}`}>
+                <t.icon size={18} strokeWidth={1.6} color="var(--ink-2)" class="mt-0.5 shrink-0" />
+                <div>
+                  <h3 class="text-[15px] font-semibold">{t.title}</h3>
+                  <p class="mt-1 text-sm text-ink-2">{t.text}</p>
+                </div>
               </div>
             ))
           }
@@ -321,28 +235,26 @@ const shapes: Record<string, string> = {
       </div>
     </section>
 
-    <!-- ================= QUESTIONS ================= -->
-    <section id="faq">
-      <div class="mx-auto grid max-w-[1440px] border-x border-line lg:grid-cols-12">
-        <div class="border-b border-line p-8 lg:col-span-4 lg:border-r lg:border-b-0">
-          <p class="label"><span class="label-brand">07</span> / Questions</p>
-          <h2 class="display wipe mt-5 text-[clamp(2.2rem,4vw,3.6rem)]">Asked often.</h2>
+    <!-- ================= Questions ================= -->
+    <section id="faq" class="border-t border-line">
+      <div class="mx-auto grid max-w-[1200px] gap-10 px-5 py-24 sm:px-8 lg:grid-cols-[1fr_2fr]">
+        <div class="reveal">
+          <p class="kicker">Questions</p>
+          <h2 class="h2 mt-3">Asked often.</h2>
+          <p class="mt-4 text-ink-2">Something else? <a href={demoUrl} class="text-ink underline decoration-line-2 underline-offset-4 hover:decoration-brand">Write to us</a>.</p>
         </div>
-        <div class="lg:col-span-8">
+        <div class="reveal border-t border-line" style="--i:1">
           {
-            faqs.map(([q, a], i) => (
-              <details class={`group border-line ${i ? "border-t" : ""}`}>
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-6 p-8 text-lg font-semibold transition-colors hover:bg-card">
-                  <span class="flex gap-6">
-                    <span class="pt-1 font-mono text-xs font-normal text-ink-3">{String(i + 1).padStart(2, "0")}</span>
-                    {q}
-                  </span>
-                  <span class="relative size-4 shrink-0" aria-hidden="true">
-                    <span class="absolute top-1/2 left-0 h-px w-4 bg-ink-2" />
-                    <span class="absolute top-0 left-1/2 h-4 w-px bg-ink-2 transition-transform duration-300 group-open:scale-y-0" />
+            faqs.map(([q, a]) => (
+              <details class="group border-b border-line">
+                <summary class="flex cursor-pointer list-none items-center justify-between gap-6 py-5 text-[16px] font-medium transition-colors hover:text-brand-ink">
+                  {q}
+                  <span class="relative size-3 shrink-0" aria-hidden="true">
+                    <span class="absolute top-1/2 left-0 h-px w-3 bg-ink-3" />
+                    <span class="absolute top-0 left-1/2 h-3 w-px bg-ink-3 transition-transform duration-300 group-open:scale-y-0" />
                   </span>
                 </summary>
-                <p class="-mt-3 max-w-2xl px-8 pb-8 pl-[4.6rem] text-ink-2">{a}</p>
+                <p class="-mt-1 max-w-2xl pb-5 text-ink-2">{a}</p>
               </details>
             ))
           }
@@ -350,20 +262,16 @@ const shapes: Record<string, string> = {
       </div>
     </section>
 
-    <!-- ================= THE END: an orange circle that opens as you scroll ================= -->
-    <section class="relative h-[170vh] border-t border-line" data-scrub>
-      <div class="sticky top-0 flex h-[100svh] items-center justify-center overflow-hidden">
-        <!-- Rings echoing the hero, turning slowly. -->
-        <svg class="absolute size-[110vmin] text-line-2" viewBox="-100 -100 200 200" fill="none" stroke="currentColor" aria-hidden="true">
-          <g class="spin-slow">{Array.from({ length: 6 }, (_, i) => <circle r={20 + i * 14} stroke-width="0.2" stroke-dasharray={i % 2 ? "1 2.5" : undefined} />)}</g>
-        </svg>
-        <div class="absolute inset-0 bg-brand" style="clip-path: circle(calc(var(--p, 0) * 85%) at 50% 50%)" aria-hidden="true"></div>
-        <div class="relative px-6 text-center" style="color: color-mix(in oklab, #09090b calc(clamp(0, (var(--p, 0) - 0.35) * 4, 1) * 100%), var(--ink))">
-          <p class="font-mono text-[11px] tracking-[0.16em] uppercase opacity-70">Set it up in an afternoon</p>
-          <h2 class="display mx-auto mt-6 max-w-4xl text-[clamp(2.6rem,7vw,6.4rem)]">Run the whole business from one place.</h2>
-          <div class="mt-10 flex flex-wrap justify-center gap-3">
-            <a href={signUpUrl} class="btn btn-solid !border-[#09090b] !bg-[#09090b] !text-ink">Get started <span class="arrow" aria-hidden="true">→</span></a>
-            <a href={demoUrl} class="btn !border-current" style="color: inherit">Book a demo</a>
+    <!-- ================= Get started ================= -->
+    <section class="px-5 pb-24 sm:px-8">
+      <div class="reveal beam panel relative mx-auto max-w-[1200px] overflow-hidden px-6 py-16 text-center sm:py-20">
+        <div class="pointer-events-none absolute -bottom-32 left-1/2 h-64 w-[640px] -translate-x-1/2 rounded-[50%] opacity-30 blur-3xl" style="background: var(--brand)" aria-hidden="true"></div>
+        <div class="relative">
+          <h2 class="h2 mx-auto max-w-2xl">Run the whole business from one place.</h2>
+          <p class="body-lg mx-auto mt-4 max-w-lg">Set it up in an afternoon: bring in your team, add your clients and send your first invoice.</p>
+          <div class="mt-8 flex flex-wrap justify-center gap-3">
+            <a href={signUpUrl} class="btn btn-primary">Get started <span class="arrow" aria-hidden="true">→</span></a>
+            <a href={demoUrl} class="btn">Book a demo</a>
           </div>
         </div>
       </div>
