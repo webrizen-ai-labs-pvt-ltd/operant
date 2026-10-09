@@ -1,0 +1,84 @@
+---
+import "@fontsource-variable/dm-sans";
+import "@fontsource-variable/geist-mono";
+import "../styles/global.css";
+import { SITE } from "../site";
+
+interface Props {
+  title?: string;
+  description?: string;
+}
+const { title, description = SITE.description } = Astro.props;
+const fullTitle = title ? `${title} · ${SITE.name}` : `${SITE.name}: ${SITE.tagline}`;
+const canonical = new URL(Astro.url.pathname, Astro.site);
+const ogImage = new URL("/og.png", Astro.site);
+
+// Structured data, so search engines know what Operant is.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: SITE.name,
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  description: SITE.description,
+  url: Astro.site?.toString(),
+  publisher: { "@type": "Organization", name: SITE.maker },
+};
+---
+
+<!doctype html>
+<html lang="en-IN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <meta name="theme-color" content="#fbf8f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#100d0b" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={SITE.name} />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body class="min-h-dvh overflow-x-clip">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-card focus:px-4 focus:py-2">Skip to content</a>
+    <slot />
+
+    <script>
+      // Pointer-following light on .spotlight cards.
+      document.addEventListener(
+        "pointermove",
+        (e) => {
+          const el = (e.target as HTMLElement | null)?.closest<HTMLElement>(".spotlight");
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          el.style.setProperty("--x", `${e.clientX - r.left}px`);
+          el.style.setProperty("--y", `${e.clientY - r.top}px`);
+        },
+        { passive: true },
+      );
+
+      // Reveal-on-scroll for browsers without CSS scroll-driven animations.
+      if (!CSS.supports("animation-timeline: view()")) {
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const en of entries) {
+              if (en.isIntersecting) {
+                en.target.classList.add("is-in");
+                io.unobserve(en.target);
+              }
+            }
+          },
+          { rootMargin: "0px 0px -10% 0px" },
+        );
+        document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+      }
+    </script>
+  </body>
+</html>

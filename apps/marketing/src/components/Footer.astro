@@ -1,0 +1,40 @@
+---
+import { demoUrl, SITE, signUpUrl } from "../site";
+const year = new Date().getFullYear();
+const cols = [
+  ["Product", [["People", "/#product"], ["Work", "/#product"], ["Finance", "/#finance"], ["Client portal", "/#portal"]]],
+  ["Get going", [["Get started", signUpUrl], ["Sign in", SITE.appUrl], ["Book a demo", demoUrl], ["Common questions", "/#faq"]]],
+] as const;
+---
+
+<footer class="relative border-t border-line bg-paper-2">
+  <div class="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
+    <div>
+      <a href="/" class="flex items-center gap-2 font-semibold"><img src="/logo.png" alt="" width="28" height="28" class="size-7 rounded-lg" /> {SITE.name}</a>
+      <p class="mt-3 max-w-sm text-sm text-ink-3">{SITE.tagline} Made in India by {SITE.maker}.</p>
+      <a href={`mailto:${SITE.contactEmail}`} class="mt-4 inline-block font-mono text-sm text-ink-2 hover:text-brand-ink">{SITE.contactEmail}</a>
+    </div>
+    {
+      cols.map(([title, items]) => (
+        <div>
+          <div class="eyebrow !text-ink-3">{title}</div>
+          <ul class="mt-4 space-y-2 text-sm">
+            {items.map(([label, href]) => (
+              <li>
+                <a href={href} class="text-ink-2 hover:text-ink">
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))
+    }
+  </div>
+  <div class="border-t border-line">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-5 py-5 text-xs text-ink-3 sm:px-8">
+      <span>© {year} {SITE.maker} Pvt Ltd</span>
+      <span>Sign-in by Webrizen SSO</span>
+    </div>
+  </div>
+</footer>

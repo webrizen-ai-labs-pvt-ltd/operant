@@ -30,6 +30,16 @@
         "dev"
       ],
       "port": 5175
+    },
+    {
+      "name": "marketing",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": [
+        "--filter",
+        "@operant/marketing",
+        "dev"
+      ],
+      "port": 4321
     }
   ]
 }

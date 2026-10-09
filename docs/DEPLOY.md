@@ -53,3 +53,15 @@ Copy the client ID, client secret and webhook signing secret.
 ## Every release
 - If the schema changed, run `pnpm db:migrate` against the direct URL **before** deploying.
 - CI runs typecheck, tests, a migration drift check, and the production build on every push.
+
+## Marketing site (`apps/marketing`)
+
+A static Astro site: every page is plain HTML, so any static host works (a separate Vercel project is simplest).
+
+- Root directory: `apps/marketing`, build command `pnpm build`, output directory `dist`.
+- Environment variables (all optional, read at build time):
+  - `PUBLIC_SITE_URL`: the site's own address, for canonical links, the sitemap and share images (default `https://operant.webrizen.com`).
+  - `PUBLIC_APP_URL`: where "Get started" and "Sign in" go (the web app).
+  - `PUBLIC_PORTAL_URL`: the client portal.
+  - `PUBLIC_CONTACT_EMAIL`: shown in the footer and used for "Book a demo".
+- Update `public/robots.txt` if the site's address changes.

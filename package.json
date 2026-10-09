@@ -6,7 +6,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "turbo run dev --parallel --filter=@operant/web --filter=@operant/portal --filter=@operant/cloud",
+    "dev": "turbo run dev --parallel --filter=@operant/web --filter=@operant/portal --filter=@operant/marketing --filter=@operant/cloud",
     "build": "turbo run build",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",

@@ -1,0 +1,446 @@
+---
+import Footer from "../components/Footer.astro";
+import Nav from "../components/Nav.astro";
+import Calculators from "../islands/Calculators.tsx";
+import ProductTour from "../islands/ProductTour.tsx";
+import Base from "../layouts/Base.astro";
+import { demoUrl, signUpUrl } from "../site";
+
+const audiences = ["CA and CS firms", "Design studios", "Consultancies", "Law practices", "Digital agencies", "Architects", "IT services", "Clinics", "Training institutes", "Event companies"];
+
+const scattered = [
+  ["Leave in a register", -6, "12%", "8%"],
+  ["Tasks in spreadsheets", 4, "52%", "2%"],
+  ["Client files on WhatsApp", -3, "4%", "44%"],
+  ["Invoices in Word", 5, "58%", "40%"],
+  ["Payment follow-ups by phone", -4, "18%", "78%"],
+  ["Decisions lost in email", 3, "56%", "80%"],
+] as const;
+
+const pillars = [
+  {
+    name: "People",
+    color: "var(--people)",
+    line: "Everyone, their manager, their leave and their first week.",
+    points: ["Directory and org chart", "Departments and teams", "Leave with approvals and a team calendar", "Onboarding checklists for new joiners"],
+  },
+  {
+    name: "Work",
+    color: "var(--work)",
+    line: "Projects your team can actually follow.",
+    points: ["Boards, lists, calendar and milestones", "Subtasks, dependencies and repeating work", "Templates for the work you do every month", "Goals and a workload view"],
+  },
+  {
+    name: "Collaboration",
+    color: "var(--collab)",
+    line: "Talk about the work where the work is.",
+    points: ["Channels and direct messages", "Comments on tasks, projects and invoices", "@mentions and notifications", "Decisions marked and easy to find"],
+  },
+  {
+    name: "Finance",
+    color: "var(--finance)",
+    line: "GST invoices to money in the bank.",
+    points: ["Quotes, invoices and credit notes", "CGST, SGST and IGST worked out for you", "Online payments and automatic reminders", "Receivables by client and by age"],
+  },
+];
+
+const story = [
+  ["A client asks", "They pick a service in your portal, tell you what they need and upload the documents you ask for.", "var(--collab)"],
+  ["You agree the work", "Reply in the conversation, send a quote, and they accept it in the portal, adding billing details as they do.", "var(--brand)"],
+  ["Work starts from a template", "One click creates the project with the right stages, milestones and tasks, and the conversation comes with it.", "var(--work)"],
+  ["Milestones bill themselves", "Finish a billable milestone and the GST invoice is drafted, ready to check and send.", "var(--finance)"],
+  ["You get paid", "The client pays online, or in instalments. Payments are recorded on their own and reminders stop.", "var(--people)"],
+] as const;
+
+const faqs = [
+  ["Who is Operant for?", "Growing businesses in India that serve clients: CA and CS firms, agencies, studios, consultancies and similar teams of 5 to a few hundred people."],
+  ["Do we need a separate password?", "No. Everyone signs in with their Webrizen account (password, email code or Google). Admins invite people from Operant or from Webrizen and choose their role."],
+  ["We're not GST-registered. Can we still invoice?", "Yes. Leave GSTIN blank and invoices go out without GST. When you register, add it and Operant handles CGST, SGST and IGST."],
+  ["Can clients pay online?", "Yes. Connect your Razorpay account and every invoice, or every instalment, gets a pay link. Payments are recorded automatically."],
+  ["Can emails come from our own address?", "Yes. Verify your domain with a few DNS records, or connect your mail server (Gmail, Microsoft 365, Zoho or your host). Until then emails go out with your name and replies come to you."],
+  ["Can we switch off what we don't need?", "Yes. Turn off People, Work, Collaboration or Finance for the whole organization and they disappear from everyone's screen."],
+  ["Where is our data kept?", "On servers in India (Mumbai). Payment gateway and mail server passwords are encrypted, and the audit log records who changed what."],
+];
+---
+
+<Base>
+  <Nav />
+  <main id="main">
+    <!-- ======================= Hero ======================= -->
+    <section class="grain relative overflow-hidden pt-32 pb-16 sm:pt-40">
+      <div class="grid-bg pointer-events-none absolute inset-0" aria-hidden="true"></div>
+      <div class="pointer-events-none absolute -top-40 left-1/2 h-[560px] w-[900px] -translate-x-1/2 rounded-full opacity-60 blur-3xl" style="background: radial-gradient(closest-side, color-mix(in oklab, var(--brand) 38%, transparent), transparent)" aria-hidden="true"></div>
+
+      <div class="relative mx-auto max-w-7xl px-5 text-center sm:px-8">
+        <a href="#portal" class="pop mx-auto inline-flex items-center gap-2 rounded-full border border-line bg-card/70 py-1 pr-3 pl-1 text-xs font-medium text-ink-2 shadow-[var(--shadow)] backdrop-blur hover:text-ink">
+          <span class="rounded-full bg-brand px-2 py-0.5 text-[11px] font-semibold text-white">New</span>
+          A portal where your clients request work and pay
+          <span aria-hidden="true">→</span>
+        </a>
+        <h1 class="display pop mx-auto mt-7 max-w-5xl text-[clamp(2.6rem,7vw,5.6rem)]" style="--i:1">
+          Your team, your work and your money.{" "}
+          <span class="relative whitespace-nowrap text-brand">
+            One place.
+            <svg class="absolute -bottom-2 left-0 w-full" viewBox="0 0 300 12" fill="none" aria-hidden="true"><path class="draw" style="--len:320" d="M2 9C60 3 160 1 298 7" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"></path></svg>
+          </span>
+        </h1>
+        <p class="lede pop mx-auto mt-6 max-w-2xl text-lg text-ink-2 sm:text-xl" style="--i:2">
+          Operant brings your people, projects, team chat, GST invoicing and client portal together, so nothing lives in a spreadsheet, a WhatsApp group or someone's head.
+        </p>
+        <div class="pop mt-9 flex flex-wrap justify-center gap-3" style="--i:3">
+          <a href={signUpUrl} class="btn-brand rounded-full px-6 py-3 text-[15px] font-semibold">Get started</a>
+          <a href={demoUrl} class="btn-ghost rounded-full px-6 py-3 text-[15px] font-semibold">Book a demo</a>
+        </div>
+        <p class="pop mt-5 text-sm text-ink-3" style="--i:4">Sign in with Webrizen · GST-ready · Made in India</p>
+      </div>
+
+      <div class="relative mx-auto mt-16 max-w-6xl px-3 sm:px-8">
+        <ProductTour client:idle />
+      </div>
+    </section>
+
+    <!-- ======================= Built for ======================= -->
+    <section class="border-y border-line bg-paper-2 py-6" aria-label="Who it's for">
+      <div class="marquee overflow-hidden">
+        <div class="marquee-track flex w-max gap-10 pr-10 text-[15px] font-medium text-ink-3">
+          {
+            [...audiences, ...audiences].map((a, i) => (
+              <span class="flex items-center gap-10 whitespace-nowrap" aria-hidden={i >= audiences.length ? "true" : undefined}>
+                {a} <span class="size-1.5 rounded-full bg-line-2" />
+              </span>
+            ))
+          }
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= The problem ======================= -->
+    <section id="product" class="mx-auto max-w-7xl px-5 py-28 sm:px-8">
+      <div class="grid items-center gap-14 lg:grid-cols-2">
+        <div class="reveal">
+          <p class="eyebrow">Why Operant</p>
+          <h2 class="display mt-4 text-[clamp(2rem,4.4vw,3.6rem)]">Stop running your business across ten tabs.</h2>
+          <p class="lede mt-5 max-w-lg text-lg text-ink-2">
+            Leave in one place, tasks in another, invoices in a third and client files somewhere in chat. Operant connects them: a client request becomes a project, a finished milestone becomes an invoice, an approved leave shows on everyone's calendar.
+          </p>
+        </div>
+        <div class="reveal relative h-[380px] rounded-[28px] border border-line bg-card shadow-[var(--shadow)]" style="--i:1" aria-hidden="true">
+          <svg class="absolute inset-0 size-full" viewBox="0 0 600 380" preserveAspectRatio="none" fill="none">
+            {
+              [
+                [90, 45], [380, 25], [70, 190], [400, 170], [140, 320], [380, 330],
+              ].map(([x, y]) => <path class="draw" style="--len:400" d={`M${x + 60} ${y + 12} Q ${(x + 300) / 2 + 40} ${(y + 190) / 2} 300 190`} stroke="var(--line-2)" stroke-width="1.5" stroke-dasharray="4 5" />)
+            }
+          </svg>
+          {
+            scattered.map(([label, rot, left, top], i) => (
+              <span class="float absolute rounded-xl border border-line bg-paper px-3 py-2 text-sm text-ink-2 shadow-[var(--shadow)]" style={`left:${left};top:${top};rotate:${rot}deg;animation-delay:${i * -1.1}s`}>
+                {label}
+              </span>
+            ))
+          }
+          <div class="absolute top-1/2 left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5 rounded-2xl bg-ink px-5 py-3.5 text-paper shadow-[var(--shadow-lg)]">
+            <img src="/logo.png" alt="" class="size-7 rounded-lg" /> <span class="text-lg font-semibold">Operant</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Four areas -->
+      <div class="mt-24 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {
+          pillars.map((p, i) => (
+            <article class="spotlight reveal rounded-3xl border border-line bg-card p-6 shadow-[var(--shadow)]" style={`--accent:${p.color};--i:${i}`}>
+              <span class="inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-xs font-semibold" style={`color:${p.color};background:color-mix(in oklab, ${p.color} 13%, transparent)`}>
+                <span class="size-2 rounded-full" style={`background:${p.color}`} /> {p.name}
+              </span>
+              <h3 class="mt-5 text-xl font-semibold tracking-tight">{p.line}</h3>
+              <ul class="mt-5 space-y-2.5 text-[15px] text-ink-2">
+                {p.points.map((pt) => (
+                  <li class="flex gap-2.5">
+                    <svg viewBox="0 0 16 16" class="mt-1 size-4 shrink-0" style={`color:${p.color}`} aria-hidden="true">
+                      <path d="M3 8.5l3 3 7-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    {pt}
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ======================= Finance bento ======================= -->
+    <section id="finance" class="relative bg-paper-2 py-28">
+      <div class="mx-auto max-w-7xl px-5 sm:px-8">
+        <div class="reveal max-w-3xl">
+          <p class="eyebrow">Finance, done the Indian way</p>
+          <h2 class="display mt-4 text-[clamp(2rem,4.4vw,3.6rem)]">Invoices your accountant will like. Payments that chase themselves.</h2>
+        </div>
+
+        <div class="mt-14 grid auto-rows-[minmax(220px,auto)] gap-4 md:grid-cols-6">
+          <article class="spotlight reveal overflow-hidden rounded-3xl border border-line bg-card p-7 md:col-span-4 md:row-span-2" style="--accent:var(--finance)">
+            <h3 class="text-2xl font-semibold tracking-tight">GST invoices without the arithmetic</h3>
+            <p class="mt-2 max-w-md text-ink-2">CGST and SGST or IGST from your state and your client's, HSN/SAC codes, gap-free numbering for each financial year, amounts in words, and a PDF that's ready to file.</p>
+            <div class="mt-8 grid gap-3 font-mono text-sm sm:grid-cols-3">
+              {
+                [
+                  ["Maharashtra → Maharashtra", "CGST 9% + SGST 9%"],
+                  ["Maharashtra → Karnataka", "IGST 18%"],
+                  ["Maharashtra → Singapore", "Export, zero-rated"],
+                ].map(([route, tax], i) => (
+                  <div class="pop rounded-2xl border border-line bg-paper p-4" style={`--i:${i}`}>
+                    <div class="font-sans text-xs text-ink-3">{route}</div>
+                    <div class="mt-2 font-semibold">{tax}</div>
+                  </div>
+                ))
+              }
+            </div>
+            <div class="mt-6 flex flex-wrap gap-2 text-sm">
+              {["Quotes to invoices in one click", "Credit notes", "Retainers that bill themselves", "Not GST-registered? Works too"].map((t) => <span class="rounded-full border border-line px-3 py-1 text-ink-2">{t}</span>)}
+            </div>
+          </article>
+
+          <article class="spotlight reveal rounded-3xl border border-line bg-card p-7 md:col-span-2" style="--accent:var(--brand);--i:1">
+            <h3 class="text-lg font-semibold">Instalments with interest</h3>
+            <p class="mt-2 text-sm text-ink-2">Split an invoice into EMIs on the reducing balance. Each instalment's interest is billed on its own GST invoice.</p>
+            <div class="mt-5 flex h-16 items-end gap-1" aria-hidden="true">
+              {[100, 92, 84, 76, 68, 60].map((h, i) => <span class="pop flex-1 rounded-t-md bg-ink/85" style={`height:${h}%;--i:${i}`} />)}
+            </div>
+          </article>
+
+          <article class="spotlight reveal rounded-3xl border border-line bg-card p-7 md:col-span-2" style="--accent:var(--collab);--i:2">
+            <h3 class="text-lg font-semibold">Pay links and reminders</h3>
+            <p class="mt-2 text-sm text-ink-2">Razorpay links on every invoice. Overdue? A polite reminder goes out the next day, then weekly, until it's paid.</p>
+            <div class="mt-5 space-y-1.5 text-xs" aria-hidden="true">
+              <div class="flex justify-between rounded-lg bg-paper-2 px-3 py-2"><span>Reminder sent</span><span class="text-ink-3">Day +1</span></div>
+              <div class="flex justify-between rounded-lg px-3 py-2 font-semibold" style="background:color-mix(in oklab, var(--people) 14%, transparent);color:var(--people)"><span>Paid online · UPI</span><span>₹70,800</span></div>
+            </div>
+          </article>
+
+          <article class="spotlight reveal rounded-3xl border border-line bg-card p-7 md:col-span-3" style="--accent:var(--finance);--i:1">
+            <h3 class="text-lg font-semibold">Know who owes what</h3>
+            <p class="mt-2 text-sm text-ink-2">Billed, collected and still due each month, what's owed by client and by age, and who's paid recently.</p>
+            <svg viewBox="0 0 300 70" class="mt-5 w-full" aria-hidden="true">
+              <path class="draw" style="--len:420" d="M0 58 C40 50 60 40 90 42 S150 20 180 26 S240 8 300 10" fill="none" stroke="var(--finance)" stroke-width="2.5" />
+              <path class="draw" style="--len:420" d="M0 64 C40 60 70 52 100 50 S160 36 190 38 S250 22 300 24" fill="none" stroke="var(--collab)" stroke-width="2.5" />
+            </svg>
+          </article>
+
+          <article class="spotlight reveal rounded-3xl border border-line bg-card p-7 md:col-span-3" style="--accent:var(--people);--i:2">
+            <h3 class="text-lg font-semibold">Emails from your own address</h3>
+            <p class="mt-2 text-sm text-ink-2">Invoices and reminders come from accounts@yourfirm.in: verify your domain, or connect Gmail, Microsoft 365 or Zoho.</p>
+            <div class="mt-5 rounded-xl border border-line bg-paper px-4 py-3 font-mono text-xs text-ink-2">From: "Mehta &amp; Co" &lt;accounts@mehtaco.in&gt;</div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= Request to paid (sticky story) ======================= -->
+    <section id="portal" class="mx-auto max-w-7xl px-5 py-28 sm:px-8">
+      <div class="reveal max-w-3xl">
+        <p class="eyebrow">The client portal</p>
+        <h2 class="display mt-4 text-[clamp(2rem,4.4vw,3.6rem)]">From a client's request to money in the bank.</h2>
+        <p class="lede mt-5 max-w-2xl text-lg text-ink-2">Your clients get their own simple site: no passwords, just a code by email. They see your team's names and faces, never your internal chat.</p>
+      </div>
+
+      <div class="story mt-16 grid gap-10 lg:grid-cols-2" data-step="0">
+        <ol class="space-y-40 pb-48">
+          {
+            story.map(([title, text, color], i) => (
+              <li class="story-step transition-opacity duration-500" data-i={i}>
+                <span class="flex size-9 items-center justify-center rounded-full font-mono text-sm font-semibold text-white" style={`background:${color}`}>
+                  {i + 1}
+                </span>
+                <h3 class="mt-4 text-2xl font-semibold tracking-tight">{title}</h3>
+                <p class="mt-2 max-w-md text-lg text-ink-2">{text}</p>
+              </li>
+            ))
+          }
+        </ol>
+        <div class="hidden lg:block">
+          <div class="sticky top-28 h-[440px] rounded-[28px] border border-line bg-card p-6 shadow-[var(--shadow-lg)]" aria-hidden="true">
+            <div class="story-visual" data-v="0">
+              <div class="text-xs text-ink-3">Your portal · Services</div>
+              <div class="mt-3 grid grid-cols-2 gap-3">
+                {["GST return filing", "Company incorporation", "Income tax return", "Statutory audit"].map((s, i) => (
+                  <div class={`rounded-2xl border p-4 ${i === 0 ? "border-brand bg-brand-soft" : "border-line"}`}>
+                    <div class="text-sm font-semibold">{s}</div>
+                    <div class="mt-1 text-xs text-ink-3">{["From ₹2,500 a month", "₹14,999", "From ₹2,999", "Price on request"][i]}</div>
+                  </div>
+                ))}
+              </div>
+              <div class="mt-4 rounded-2xl border border-line p-4 text-sm">
+                <div class="font-semibold">Upload what's needed</div>
+                <div class="mt-2 space-y-1.5 text-xs text-ink-2">
+                  <div class="flex justify-between"><span>Sales register</span><span style="color:var(--people)">Uploaded</span></div>
+                  <div class="flex justify-between"><span>Purchase invoices</span><span class="text-ink-3">Needed</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="story-visual" data-v="1">
+              <div class="text-xs text-ink-3">Quote QT/26-27/0012</div>
+              <div class="mt-2 font-mono text-4xl font-semibold">₹29,500</div>
+              <div class="mt-1 text-sm text-ink-3">Monthly GST returns, two states</div>
+              <div class="mt-6 flex gap-2"><span class="btn-brand rounded-full px-4 py-2 text-sm font-semibold">Accept quote</span><span class="btn-ghost rounded-full px-4 py-2 text-sm font-semibold">Decline</span></div>
+              <div class="mt-6 rounded-2xl border border-line p-4 text-sm">
+                <div class="font-semibold">Billing details</div>
+                <div class="mt-1 text-xs text-ink-3">Asked for once, only when it's needed.</div>
+              </div>
+            </div>
+            <div class="story-visual" data-v="2">
+              <div class="text-xs text-ink-3">New project from template</div>
+              <div class="mt-3 space-y-2">
+                {["Collect sales and purchase data", "Reconcile with GSTR-2B", "File GSTR-1", "File GSTR-3B"].map((t, i) => (
+                  <div class="pop flex items-center gap-3 rounded-xl border border-line p-3 text-sm" style={`--i:${i}`}>
+                    <span class="font-mono text-xs text-ink-3">GST-{i + 1}</span> {t}
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div class="story-visual" data-v="3">
+              <div class="text-xs text-ink-3">Milestone completed · invoice drafted</div>
+              <div class="mt-3 rounded-2xl border border-line p-5">
+                <div class="flex justify-between text-sm font-semibold"><span>TAX INVOICE</span><span class="font-mono text-ink-3">Draft</span></div>
+                <div class="mt-4 space-y-1 text-sm"><div class="flex justify-between"><span>October returns</span><span class="font-mono">₹25,000</span></div><div class="flex justify-between text-ink-3"><span>IGST 18%</span><span class="font-mono">₹4,500</span></div></div>
+                <div class="mt-3 flex justify-between border-t border-line pt-3 font-semibold"><span>Total</span><span class="font-mono">₹29,500</span></div>
+              </div>
+            </div>
+            <div class="story-visual" data-v="4">
+              <div class="flex h-full flex-col items-center justify-center text-center">
+                <span class="flex size-16 items-center justify-center rounded-full text-white" style="background:var(--people)">
+                  <svg viewBox="0 0 24 24" class="size-8" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12.5l4.5 4.5L19 7.5"></path></svg>
+                </span>
+                <div class="mt-5 font-mono text-3xl font-semibold">₹29,500 received</div>
+                <div class="mt-1 text-sm text-ink-3">Paid online by UPI · recorded automatically</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= Try it ======================= -->
+    <section id="try" class="relative overflow-hidden bg-paper-2 py-28">
+      <div class="mx-auto max-w-6xl px-5 sm:px-8">
+        <div class="reveal mx-auto max-w-2xl text-center">
+          <p class="eyebrow">Try it</p>
+          <h2 class="display mt-4 text-[clamp(2rem,4.4vw,3.4rem)]">The same maths as your invoices.</h2>
+          <p class="lede mt-4 text-lg text-ink-2">These calculators run the exact code Operant uses on real invoices. Change the numbers.</p>
+        </div>
+        <div class="mt-12">
+          <Calculators client:visible />
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================= Trust ======================= -->
+    <section class="mx-auto max-w-7xl px-5 py-28 sm:px-8">
+      <div class="reveal max-w-3xl">
+        <p class="eyebrow">Built to be trusted</p>
+        <h2 class="display mt-4 text-[clamp(2rem,4.4vw,3.4rem)]">Your data, your rules.</h2>
+      </div>
+      <div class="mt-12 grid gap-px overflow-hidden rounded-3xl border border-line bg-line sm:grid-cols-2 lg:grid-cols-3">
+        {
+          [
+            ["One sign-in, with roles", "People sign in with their Webrizen account. Roles decide who sees Finance, approves leave or changes settings."],
+            ["Audit log", "Who issued an invoice, voided a payment or changed a setting, and when."],
+            ["Secrets stay secret", "Payment gateway keys and mail server passwords are encrypted and never shown again."],
+            ["Hosted in India", "Your data lives on servers in Mumbai."],
+            ["Clients see only theirs", "Each client sees their own requests, projects, documents and invoices. Nothing else."],
+            ["Works anywhere", "In any browser, on your laptop or your phone. Nothing to install."],
+          ].map(([t, d], i) => (
+            <div class="reveal bg-card p-7" style={`--i:${i % 3}`}>
+              <h3 class="font-semibold">{t}</h3>
+              <p class="mt-2 text-sm text-ink-2">{d}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ======================= FAQ ======================= -->
+    <section id="faq" class="mx-auto max-w-3xl px-5 pb-28 sm:px-8">
+      <h2 class="display reveal text-center text-[clamp(2rem,4vw,3rem)]">Common questions</h2>
+      <div class="mt-10 divide-y divide-line border-y border-line">
+        {
+          faqs.map(([q, a]) => (
+            <details class="group py-5">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-lg font-semibold">
+                {q}
+                <span class="flex size-8 shrink-0 items-center justify-center rounded-full border border-line text-ink-3 transition group-open:rotate-45" aria-hidden="true">
+                  +
+                </span>
+              </summary>
+              <p class="mt-3 max-w-2xl text-ink-2">{a}</p>
+            </details>
+          ))
+        }
+      </div>
+    </section>
+
+    <!-- ======================= Final CTA ======================= -->
+    <section class="px-3 pb-3 sm:px-5 sm:pb-5">
+      <div class="grain relative mx-auto max-w-7xl overflow-hidden rounded-[32px] bg-[#17120f] px-6 py-20 text-center text-[#f6efe8] sm:py-28">
+        <div class="pointer-events-none absolute -bottom-40 left-1/2 h-[420px] w-[820px] -translate-x-1/2 rounded-full opacity-70 blur-3xl" style="background: radial-gradient(closest-side, #f46036, transparent)" aria-hidden="true"></div>
+        <div class="relative">
+          <h2 class="display mx-auto max-w-3xl text-[clamp(2.2rem,5vw,4.2rem)]">Run the whole business from one place.</h2>
+          <p class="mx-auto mt-5 max-w-xl text-lg text-[#c9bdb1]">Set it up in an afternoon: bring in your team, add your clients, and send your first invoice.</p>
+          <div class="mt-9 flex flex-wrap justify-center gap-3">
+            <a href={signUpUrl} class="btn-brand rounded-full px-7 py-3.5 text-[15px] font-semibold">Get started</a>
+            <a href={demoUrl} class="rounded-full px-7 py-3.5 text-[15px] font-semibold text-[#f6efe8] ring-1 ring-white/25 hover:bg-white/10">Book a demo</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+  <Footer />
+</Base>
+
+<style>
+  /* The sticky story: only the visual for the step in view is shown. */
+  .story-visual {
+    position: absolute;
+    inset: 1.5rem;
+    opacity: 0;
+    translate: 0 12px;
+    transition:
+      opacity 0.5s,
+      translate 0.5s;
+    pointer-events: none;
+  }
+  .story[data-step="0"] .story-visual[data-v="0"],
+  .story[data-step="1"] .story-visual[data-v="1"],
+  .story[data-step="2"] .story-visual[data-v="2"],
+  .story[data-step="3"] .story-visual[data-v="3"],
+  .story[data-step="4"] .story-visual[data-v="4"] {
+    opacity: 1;
+    translate: 0 0;
+  }
+  @media (min-width: 1024px) {
+    .story-step {
+      opacity: 0.35;
+    }
+    .story[data-step="0"] .story-step[data-i="0"],
+    .story[data-step="1"] .story-step[data-i="1"],
+    .story[data-step="2"] .story-step[data-i="2"],
+    .story[data-step="3"] .story-step[data-i="3"],
+    .story[data-step="4"] .story-step[data-i="4"] {
+      opacity: 1;
+    }
+  }
+</style>
+
+<script>
+  // Which step of the story is in the middle of the screen.
+  const story = document.querySelector<HTMLElement>(".story");
+  if (story) {
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) if (e.isIntersecting) story.dataset.step = (e.target as HTMLElement).dataset.i;
+      },
+      { rootMargin: "-45% 0px -45% 0px" },
+    );
+    story.querySelectorAll(".story-step").forEach((el) => io.observe(el));
+  }
+</script>
