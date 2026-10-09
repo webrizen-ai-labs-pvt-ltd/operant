@@ -73,8 +73,10 @@ const faqs = [
   <main id="main">
     <!-- ================= Hero ================= -->
     <section id="hero" class="relative overflow-hidden">
-      <div class="mx-auto grid max-w-[1200px] items-center gap-10 px-5 pt-32 pb-20 sm:px-8 lg:grid-cols-[1.1fr_1fr] lg:pt-36 lg:pb-24">
-        <div>
+      <!-- Contour-line terrain (WebGL); the hero is plain without it. -->
+      <canvas id="terrain" class="absolute inset-0 size-full opacity-0 transition-opacity duration-[1.5s] data-[ready]:opacity-100" aria-hidden="true"></canvas>
+      <div class="relative mx-auto flex min-h-[88svh] max-w-[1200px] items-center px-5 pt-32 pb-20 sm:px-8 lg:pt-36 lg:pb-24">
+        <div class="max-w-[640px]">
           <a href="#how" class="intro inline-flex items-center gap-2 border border-line px-3 py-1.5 text-xs text-ink-2 transition-colors hover:border-line-2 hover:text-ink">
             <span class="bg-brand px-1.5 py-0.5 text-[10px] font-semibold text-[#09090b]">New</span>
             A portal where your clients request work and pay
@@ -97,13 +99,6 @@ const faqs = [
           </ul>
         </div>
 
-        <!-- The emblem: WebGL rings, with static SVG rings until (or instead of) WebGL. -->
-        <div class="relative mx-auto aspect-square w-full max-w-[460px]" aria-hidden="true">
-          <svg class="absolute inset-[8%] text-brand/35" viewBox="-100 -100 200 200" fill="none" stroke="currentColor">
-            {Array.from({ length: 10 }, (_, i) => <circle r={12 + i * 8.5} stroke-width="0.35" stroke-dasharray={i % 2 ? "1 2.5" : undefined} />)}
-          </svg>
-          <canvas id="rings" class="absolute inset-0 size-full opacity-0 transition-opacity duration-1000 data-[ready]:opacity-100"></canvas>
-        </div>
       </div>
     </section>
 
@@ -281,8 +276,8 @@ const faqs = [
 </Base>
 
 <script>
-  import { mountRings } from "../scripts/rings";
-  const canvas = document.getElementById("rings") as HTMLCanvasElement | null;
+  import { mountContours } from "../scripts/contours";
+  const canvas = document.getElementById("terrain") as HTMLCanvasElement | null;
   const hero = document.getElementById("hero");
-  if (canvas && hero) mountRings(canvas, hero);
+  if (canvas && hero) mountContours(canvas, hero);
 </script>
