@@ -1,0 +1,11 @@
+---
+// The Operant mark: the logo in white on an orange square (no rounding).
+interface Props {
+  size?: number;
+}
+const { size = 28 } = Astro.props;
+---
+
+<span class="inline-flex shrink-0 items-center justify-center bg-brand" style={`width:${size}px;height:${size}px`}>
+  <img src="/logo.png" alt="" width={size * 0.72} height={size * 0.72} style="filter: brightness(0) invert(1)" />
+</span>

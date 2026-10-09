@@ -17,7 +17,7 @@ function Label({ htmlFor, children }: { htmlFor: string; children: React.ReactNo
     </label>
   );
 }
-const field = "w-full rounded-xl border border-line-2 bg-card px-3 py-2.5 text-[15px] text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15";
+const field = "w-full border border-line-2 bg-card px-3 py-2.5 text-[15px] text-ink outline-none transition focus:border-brand focus:ring-4 focus:ring-brand/15";
 
 function Gst() {
   const id = useId();
@@ -45,7 +45,7 @@ function Gst() {
                 role="radio"
                 aria-checked={rate === r}
                 onClick={() => setRate(r)}
-                className={`flex-1 rounded-xl py-2 text-sm font-semibold transition ${rate === r ? "btn-brand" : "btn-ghost text-ink-2"}`}
+                className={`flex-1 py-2 text-sm font-semibold transition ${rate === r ? "bg-brand text-[#09090b]" : "border border-line-2 text-ink-2"}`}
               >
                 {r}%
               </button>
@@ -74,7 +74,7 @@ function Gst() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-paper-2 p-5" aria-live="polite">
+      <div className=" border border-line bg-paper-2 p-5" aria-live="polite">
         <div className="eyebrow">{supply === "intra" ? "Same state: CGST + SGST" : "Different states: IGST"}</div>
         <dl className="mt-4 space-y-2 font-mono text-sm">
           <div className="flex justify-between">
@@ -152,7 +152,7 @@ function Emi() {
         </div>
       </div>
 
-      <div className="rounded-2xl border border-line bg-paper-2 p-5" aria-live="polite">
+      <div className=" border border-line bg-paper-2 p-5" aria-live="polite">
         {s ? (
           <>
             <div className="flex flex-wrap items-end justify-between gap-2">
@@ -167,7 +167,7 @@ function Emi() {
             {/* Each bar: principal (ink) and interest (orange), falling as the balance is repaid. */}
             <div className="mt-5 flex h-28 items-end gap-1" role="img" aria-label={`Schedule of ${count} instalments; interest falls from ${inr(s.rows[0]!.interest)} to ${inr(s.rows.at(-1)!.interest)}`}>
               {s.rows.map((r) => (
-                <div key={r.seq} className="flex flex-1 flex-col justify-end overflow-hidden rounded-t-[4px]" title={`Instalment ${r.seq}: principal ${inr(r.principal)}, interest ${inr(r.interest)}`}>
+                <div key={r.seq} className="flex flex-1 flex-col justify-end overflow-hidden" title={`Instalment ${r.seq}: principal ${inr(r.principal)}, interest ${inr(r.interest)}`}>
                   <span style={{ height: `${(r.interest / max) * 100}%`, background: "var(--brand)" }} className="transition-[height] duration-500" />
                   <span style={{ height: `${(r.principal / max) * 100}%`, background: "var(--ink)" }} className="border-t-2 border-paper-2 opacity-85 transition-[height] duration-500" />
                 </div>
@@ -175,10 +175,10 @@ function Emi() {
             </div>
             <div className="mt-2 flex gap-4 text-xs text-ink-3">
               <span className="flex items-center gap-1.5">
-                <i className="size-2 rounded-sm bg-ink opacity-85" /> Principal
+                <i className="size-2 bg-ink opacity-85" /> Principal
               </span>
               <span className="flex items-center gap-1.5">
-                <i className="size-2 rounded-sm bg-brand" /> Interest (reducing balance)
+                <i className="size-2 bg-brand" /> Interest (reducing balance)
               </span>
             </div>
             <p className="mt-4 text-xs text-ink-3">In Operant, each instalment's interest gets its own GST invoice when it falls due, the client gets a link to pay, and reminders go out on their own.</p>
@@ -194,8 +194,8 @@ function Emi() {
 export default function Calculators() {
   const [tab, setTab] = useState<"gst" | "emi">("gst");
   return (
-    <div className="rounded-[28px] border border-line bg-card p-5 shadow-[var(--shadow-lg)] sm:p-8">
-      <div role="tablist" aria-label="Calculators" className="mb-6 inline-flex rounded-full bg-paper-2 p-1">
+    <div className=" border border-line bg-card p-5 sm:p-8">
+      <div role="tablist" aria-label="Calculators" className="mb-6 inline-flex bg-paper-2 p-1">
         {[
           ["gst", "GST invoice"],
           ["emi", "Instalments (EMI)"],
@@ -205,7 +205,7 @@ export default function Calculators() {
             role="tab"
             aria-selected={tab === k}
             onClick={() => setTab(k as "gst" | "emi")}
-            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${tab === k ? "bg-card text-ink shadow-[var(--shadow)]" : "text-ink-3 hover:text-ink"}`}
+            className={` px-4 py-1.5 text-sm font-semibold transition ${tab === k ? "bg-card text-ink" : "text-ink-3 hover:text-ink"}`}
           >
             {l}
           </button>

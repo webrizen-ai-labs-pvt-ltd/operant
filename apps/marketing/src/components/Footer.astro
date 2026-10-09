@@ -1,27 +1,28 @@
 ---
 import { demoUrl, SITE, signUpUrl } from "../site";
+import Mark from "./Mark.astro";
 const year = new Date().getFullYear();
 const cols = [
-  ["Product", [["People", "/#product"], ["Work", "/#product"], ["Finance", "/#finance"], ["Client portal", "/#portal"]]],
-  ["Get going", [["Get started", signUpUrl], ["Sign in", SITE.appUrl], ["Book a demo", demoUrl], ["Common questions", "/#faq"]]],
+  ["Product", [["The system", "/#system"], ["Finance", "/#finance"], ["Client portal", "/#portal"], ["Try it", "/#try"]]],
+  ["Start", [["Get started", signUpUrl], ["Sign in", SITE.appUrl], ["Book a demo", demoUrl], ["Questions", "/#faq"]]],
 ] as const;
 ---
 
-<footer class="relative border-t border-line bg-paper-2">
-  <div class="mx-auto grid max-w-7xl gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr]">
-    <div>
-      <a href="/" class="flex items-center gap-2 font-semibold"><img src="/logo.png" alt="" width="28" height="28" class="size-7 rounded-lg" /> {SITE.name}</a>
-      <p class="mt-3 max-w-sm text-sm text-ink-3">{SITE.tagline} Made in India by {SITE.maker}.</p>
-      <a href={`mailto:${SITE.contactEmail}`} class="mt-4 inline-block font-mono text-sm text-ink-2 hover:text-brand-ink">{SITE.contactEmail}</a>
+<footer class="relative border-t border-line">
+  <div class="mx-auto grid max-w-[1440px] border-x border-line md:grid-cols-[2fr_1fr_1fr]">
+    <div class="border-b border-line p-8 md:border-r md:border-b-0">
+      <a href="/" class="flex items-center gap-3 font-semibold"><Mark /> {SITE.name}</a>
+      <p class="mt-4 max-w-sm text-sm text-ink-3">{SITE.tagline} Made in India by {SITE.maker}.</p>
+      <a href={`mailto:${SITE.contactEmail}`} class="mt-6 inline-block font-mono text-sm text-ink-2 underline decoration-line-2 underline-offset-4 hover:text-brand">{SITE.contactEmail}</a>
     </div>
     {
-      cols.map(([title, items]) => (
-        <div>
-          <div class="eyebrow !text-ink-3">{title}</div>
-          <ul class="mt-4 space-y-2 text-sm">
+      cols.map(([title, items], i) => (
+        <div class={`p-8 ${i === 0 ? "border-b border-line md:border-r md:border-b-0" : ""}`}>
+          <div class="label">{title}</div>
+          <ul class="mt-5 space-y-3 text-sm">
             {items.map(([label, href]) => (
               <li>
-                <a href={href} class="text-ink-2 hover:text-ink">
+                <a href={href} class="text-ink-2 hover:text-brand">
                   {label}
                 </a>
               </li>
@@ -31,10 +32,18 @@ const cols = [
       ))
     }
   </div>
-  <div class="border-t border-line">
-    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-5 py-5 text-xs text-ink-3 sm:px-8">
-      <span>© {year} {SITE.maker} Pvt Ltd</span>
-      <span>Sign-in by Webrizen SSO</span>
+  <!-- The wordmark, in outline, filling with orange as you reach the end of the page. -->
+  <div class="relative mx-auto max-w-[1440px] overflow-hidden border-x border-t border-line" data-scrub aria-hidden="true">
+    <div class="outline-text select-none px-4 text-center text-[clamp(5rem,22vw,22rem)] leading-[0.8] font-semibold tracking-[-0.06em]">OPERANT</div>
+    <div
+      class="absolute inset-0 px-4 text-center text-[clamp(5rem,22vw,22rem)] leading-[0.8] font-semibold tracking-[-0.06em] text-brand"
+      style="clip-path: inset(0 calc(100% - var(--p, 0) * 100%) 0 0)"
+    >
+      OPERANT
     </div>
+  </div>
+  <div class="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-2 border-x border-t border-line px-8 py-5 font-mono text-[11px] text-ink-3">
+    <span>© {year} {SITE.maker} Pvt Ltd</span>
+    <span>Sign-in by Webrizen SSO</span>
   </div>
 </footer>

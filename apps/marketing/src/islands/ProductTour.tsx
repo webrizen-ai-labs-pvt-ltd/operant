@@ -16,17 +16,17 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
-const Dot = ({ c }: { c: string }) => <span className="inline-block size-2 rounded-full" style={{ background: c }} />;
+const Dot = ({ c }: { c: string }) => <span className="inline-block size-2" style={{ background: c }} />;
 const Pill = ({ children, tone = "var(--ink-3)" }: { children: React.ReactNode; tone?: string }) => (
-  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold" style={{ color: tone, background: `color-mix(in oklab, ${tone} 14%, transparent)` }}>
+  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold" style={{ color: tone, background: `color-mix(in oklab, ${tone} 14%, transparent)` }}>
     {children}
   </span>
 );
 const Card = ({ children, className = "" }: { children: React.ReactNode; className?: string }) => (
-  <div className={`rounded-xl border border-line bg-card p-3 shadow-[0_1px_2px_rgb(0_0_0/0.04)] ${className}`}>{children}</div>
+  <div className={` border border-line bg-card p-3 ${className}`}>{children}</div>
 );
 const Avatar = ({ n, c }: { n: string; c: string }) => (
-  <span className="flex size-6 shrink-0 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: c }}>
+  <span className="flex size-6 shrink-0 items-center justify-center text-[9px] font-bold text-white" style={{ background: c }}>
     {n}
   </span>
 );
@@ -73,8 +73,8 @@ function Home() {
           <div className="flex h-24 items-end gap-1.5">
             {bars.map((h, i) => (
               <div key={i} className="flex h-full flex-1 items-end gap-0.5">
-                <span className="pop w-full rounded-t-[3px]" style={{ height: `${h}%`, background: "var(--finance)", "--i": i } as React.CSSProperties} />
-                <span className="pop w-full rounded-t-[3px]" style={{ height: `${h * 0.82}%`, background: "var(--collab)", "--i": i } as React.CSSProperties} />
+                <span className="pop w-full" style={{ height: `${h}%`, background: "var(--finance)", "--i": i } as React.CSSProperties} />
+                <span className="pop w-full" style={{ height: `${h * 0.82}%`, background: "var(--collab)", "--i": i } as React.CSSProperties} />
               </div>
             ))}
           </div>
@@ -88,8 +88,8 @@ function Home() {
           ["New client request", "var(--collab)"],
           ["1 draft invoice to send", "var(--finance)"],
         ].map(([t, c], i) => (
-          <div key={t} className="pop flex items-center gap-2 rounded-lg border border-line p-2 text-[11px]" style={{ "--i": i } as React.CSSProperties}>
-            <span className="size-6 shrink-0 rounded-md" style={{ background: `color-mix(in oklab, ${c} 18%, transparent)` }} />
+          <div key={t} className="pop flex items-center gap-2 border border-line p-2 text-[11px]" style={{ "--i": i } as React.CSSProperties}>
+            <span className="size-6 shrink-0" style={{ background: `color-mix(in oklab, ${c} 18%, transparent)` }} />
             {t}
           </div>
         ))}
@@ -109,14 +109,14 @@ function Work() {
   return (
     <div>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <span className="flex size-7 items-center justify-center rounded-lg bg-brand font-mono text-[10px] font-bold text-white">GST</span>
+        <span className="flex size-7 items-center justify-center bg-brand font-mono text-[10px] font-bold text-white">GST</span>
         <div>
           <div className="text-sm font-semibold">Monthly GST returns · Kaveri Foods</div>
           <div className="text-[10px] text-ink-3">68% done · due 20 Oct</div>
         </div>
         <div className="ml-auto flex gap-1">
           {["Board", "List", "Calendar", "Milestones", "Client"].map((v, i) => (
-            <span key={v} className={`rounded-md px-2 py-1 text-[10px] font-semibold ${i === 0 ? "bg-paper-2 text-ink" : "text-ink-3"}`}>
+            <span key={v} className={` px-2 py-1 text-[10px] font-semibold ${i === 0 ? "bg-paper-2 text-ink" : "text-ink-3"}`}>
               {v}
             </span>
           ))}
@@ -124,13 +124,13 @@ function Work() {
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {cols.map((c, ci) => (
-          <div key={c.name} className="rounded-xl bg-paper-2 p-2">
+          <div key={c.name} className=" bg-paper-2 p-2">
             <div className="mb-2 flex items-center justify-between text-[10px] font-semibold text-ink-2">
               {c.name} <span className="text-ink-3">{c.tasks.length}</span>
             </div>
             <div className="space-y-2">
               {c.tasks.map(([k, t, who], i) => (
-                <div key={k} className="pop rounded-lg border border-line bg-card p-2" style={{ "--i": ci * 2 + i } as React.CSSProperties}>
+                <div key={k} className="pop border border-line bg-card p-2" style={{ "--i": ci * 2 + i } as React.CSSProperties}>
                   <div className="font-mono text-[9px] text-ink-3">{k}</div>
                   <div className={`mt-0.5 text-[11px] font-medium ${c.name === "Done" ? "text-ink-3 line-through" : ""}`}>{t}</div>
                   <div className="mt-2 flex items-center justify-between">
@@ -185,8 +185,8 @@ function Finance() {
           </div>
         </div>
         <div className="mt-3 flex gap-2">
-          <span className="btn-brand rounded-md px-2.5 py-1 text-[10px] font-semibold">Pay online</span>
-          <span className="btn-ghost rounded-md px-2.5 py-1 text-[10px] font-semibold">Split into instalments</span>
+          <span className="bg-brand text-[#09090b] px-2.5 py-1 text-[10px] font-semibold">Pay online</span>
+          <span className="border border-line-2 px-2.5 py-1 text-[10px] font-semibold">Split into instalments</span>
         </div>
       </Card>
       <div className="space-y-3">
@@ -211,7 +211,7 @@ function Finance() {
         </Card>
         <Card>
           <div className="text-[11px] font-semibold">Owed by age</div>
-          <div className="mt-2 flex h-2 overflow-hidden rounded-full">
+          <div className="mt-2 flex h-2 overflow-hidden">
             {[
               [46, "#d4a94a"],
               [30, "#c09332"],
@@ -243,14 +243,14 @@ function Chat() {
     <div className="grid gap-3 sm:grid-cols-[150px_1fr]">
       <div className="hidden space-y-0.5 text-[11px] sm:block">
         {["# general", "# audit", "# gst-desk", "# advisory"].map((c, i) => (
-          <div key={c} className={`rounded-md px-2 py-1 ${i === 1 ? "bg-paper-2 font-semibold" : "text-ink-3"}`}>
+          <div key={c} className={` px-2 py-1 ${i === 1 ? "bg-paper-2 font-semibold" : "text-ink-3"}`}>
             {c}
           </div>
         ))}
       </div>
       <Card className="space-y-3">
         {msgs.map(([n, c, name, t], i) => (
-          <div key={i} className={`pop flex gap-2 ${i === 2 ? "rounded-lg p-1.5" : ""}`} style={{ "--i": i * 2, ...(i === 2 ? { background: "color-mix(in oklab, var(--finance) 10%, transparent)" } : {}) } as React.CSSProperties}>
+          <div key={i} className={`pop flex gap-2 ${i === 2 ? " p-1.5" : ""}`} style={{ "--i": i * 2, ...(i === 2 ? { background: "color-mix(in oklab, var(--finance) 10%, transparent)" } : {}) } as React.CSSProperties}>
             <Avatar n={n!} c={c!} />
             <div className="min-w-0">
               <div className="text-[10px]">
@@ -260,14 +260,14 @@ function Chat() {
               <div className="text-[11px] text-ink-2">{t}</div>
               {i === 0 ? (
                 <div className="mt-1 flex gap-1">
-                  <span className="rounded-full border border-line px-1.5 text-[10px]">👍 3</span>
-                  <span className="rounded-full border border-line px-1.5 text-[10px]">🎉 1</span>
+                  <span className=" border border-line px-1.5 text-[10px]">👍 3</span>
+                  <span className=" border border-line px-1.5 text-[10px]">🎉 1</span>
                 </div>
               ) : null}
             </div>
           </div>
         ))}
-        <div className="rounded-lg border border-line px-2 py-1.5 text-[11px] text-ink-3">Message #audit</div>
+        <div className=" border border-line px-2 py-1.5 text-[11px] text-ink-3">Message #audit</div>
       </Card>
     </div>
   );
@@ -284,8 +284,8 @@ function Portal() {
           ["2 documents needed", "var(--finance)"],
           ["1 invoice to pay · ₹70,800", "var(--collab)"],
         ].map(([t, c], i) => (
-          <div key={t} className="pop flex items-center gap-2 rounded-lg border border-line bg-card p-2 text-[11px]" style={{ "--i": i } as React.CSSProperties}>
-            <span className="size-5 rounded-md" style={{ background: `color-mix(in oklab, ${c} 20%, transparent)` }} />
+          <div key={t} className="pop flex items-center gap-2 border border-line bg-card p-2 text-[11px]" style={{ "--i": i } as React.CSSProperties}>
+            <span className="size-5" style={{ background: `color-mix(in oklab, ${c} 20%, transparent)` }} />
             {t}
           </div>
         ))}
@@ -297,15 +297,15 @@ function Portal() {
         </div>
         <div className="flex gap-1">
           {[1, 1, 0, 0].map((on, i) => (
-            <span key={i} className="h-1 flex-1 rounded-full" style={{ background: on ? "var(--brand)" : "var(--line)" }} />
+            <span key={i} className="h-1 flex-1" style={{ background: on ? "var(--brand)" : "var(--line)" }} />
           ))}
         </div>
         <div className="flex gap-2">
           <Avatar n="AR" c="#f46036" />
-          <div className="rounded-xl rounded-tl-sm bg-paper-2 px-2.5 py-1.5 text-[11px]">Could you upload September's sales register? I'll send the quote today.</div>
+          <div className=" bg-paper-2 px-2.5 py-1.5 text-[11px]">Could you upload September's sales register? I'll send the quote today.</div>
         </div>
         <div className="flex justify-end">
-          <div className="rounded-xl rounded-br-sm bg-brand px-2.5 py-1.5 text-[11px] text-white">Uploading it now.</div>
+          <div className=" bg-brand px-2.5 py-1.5 text-[11px] text-white">Uploading it now.</div>
         </div>
         <div className="space-y-1 border-t border-line pt-2 text-[10px]">
           <div className="flex justify-between">
@@ -358,7 +358,7 @@ export default function ProductTour() {
   const Panel = PANELS[tab];
   return (
     <div ref={root} className="relative">
-      <div role="tablist" aria-label="Product areas" className="mx-auto mb-5 flex w-fit max-w-full gap-1 overflow-x-auto rounded-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden border border-line bg-card/80 p-1 shadow-[var(--shadow)] backdrop-blur">
+      <div role="tablist" aria-label="Product areas" className="flex w-full overflow-x-auto border border-b-0 border-line bg-paper [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {TABS.map((t) => {
           const active = t.key === tab;
           return (
@@ -370,30 +370,30 @@ export default function ProductTour() {
                 setAuto(false);
                 go(t.key);
               }}
-              className={`relative flex shrink-0 items-center gap-2 overflow-hidden rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${active ? "bg-ink text-paper" : "text-ink-3 hover:text-ink"}`}
+              className={`relative flex shrink-0 items-center gap-2 overflow-hidden border-r border-line px-5 py-3 font-mono text-xs tracking-wide uppercase transition ${active ? "bg-brand text-[#09090b]" : "text-ink-3 hover:bg-card hover:text-ink"}`}
             >
               <Dot c={t.color} />
               {t.label}
-              {active && auto && visible ? <span key={tab} className="absolute bottom-0 left-0 h-0.5 bg-brand" style={{ animation: "tour-progress 5.2s linear forwards" }} /> : null}
+              {active && auto && visible ? <span key={tab} className="absolute bottom-0 left-0 h-0.5 bg-[#09090b]/60" style={{ animation: "tour-progress 5.2s linear forwards" }} /> : null}
             </button>
           );
         })}
       </div>
 
-      <div className="rounded-[22px] border border-line-2 bg-paper-2/80 p-1.5 shadow-[var(--shadow-lg)] backdrop-blur" style={{ viewTransitionName: "tour" }}>
-        <div className="overflow-hidden rounded-[17px] border border-line bg-paper">
+      <div className="border border-line bg-paper" style={{ viewTransitionName: "tour" }}>
+        <div className="overflow-hidden">
           <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
             <span className="flex gap-1.5">
-              <i className="size-2.5 rounded-full bg-[#ff5f57]" />
-              <i className="size-2.5 rounded-full bg-[#febc2e]" />
-              <i className="size-2.5 rounded-full bg-[#28c840]" />
+              <i className="size-2.5 bg-[#ff5f57]" />
+              <i className="size-2.5 bg-[#febc2e]" />
+              <i className="size-2.5 bg-[#28c840]" />
             </span>
-            <span className="mx-auto rounded-md bg-paper-2 px-3 py-0.5 font-mono text-[10px] text-ink-3">{tab === "portal" ? "Client portal · Kaveri Foods" : `Operant · ${TABS.find((t) => t.key === tab)!.label}`}</span>
+            <span className="mx-auto bg-paper-2 px-3 py-0.5 font-mono text-[10px] text-ink-3">{tab === "portal" ? "Client portal · Kaveri Foods" : `Operant · ${TABS.find((t) => t.key === tab)!.label}`}</span>
           </div>
           <div className="flex">
             <aside className="hidden w-36 shrink-0 space-y-0.5 border-r border-line p-3 text-[11px] md:block">
               <div className="mb-3 flex items-center gap-1.5 font-semibold">
-                <img src="/logo.png" alt="" className="size-5 rounded" /> Operant
+                <img src="/logo.png" alt="" className="size-5" /> Operant
               </div>
               {[
                 ["Home", "home"],
@@ -402,7 +402,7 @@ export default function ProductTour() {
                 ["Collaboration", "chat"],
                 ["Finance", "finance"],
               ].map(([l, k]) => (
-                <div key={l} className={`rounded-md px-2 py-1 ${k === tab ? "bg-paper-2 font-semibold text-ink" : "text-ink-3"}`}>
+                <div key={l} className={` px-2 py-1 ${k === tab ? "bg-paper-2 font-semibold text-ink" : "text-ink-3"}`}>
                   {l}
                 </div>
               ))}
