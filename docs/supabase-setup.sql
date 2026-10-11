@@ -26,7 +26,7 @@ create policy "operant members listen to their org"
 -- select cron.schedule(
 --   'operant-sync-members', '30 20 * * *',  -- 02:00 IST
 --   $$ select net.http_post(
---        url := 'https://operant.webrizen.com/api/cron/sync-members',
+--        url := 'https://app.siemmi.com/api/cron/sync-members',
 --        headers := jsonb_build_object('authorization', 'Bearer <CRON_SECRET>')
 --      ) $$
 -- );
@@ -35,7 +35,7 @@ create policy "operant members listen to their org"
 -- select cron.schedule(
 --   'operant-finance', '30 3 * * *',
 --   $$ select net.http_post(
---        url := 'https://operant.webrizen.com/api/cron/finance',
+--        url := 'https://app.siemmi.com/api/cron/finance',
 --        headers := jsonb_build_object('authorization', 'Bearer <CRON_SECRET>')
 --      ) $$
 -- );

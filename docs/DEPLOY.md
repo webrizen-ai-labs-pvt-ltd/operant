@@ -1,6 +1,6 @@
 # Deploying the cloud edition
 
-One Vercel project serves both the SPA and the API from the same domain (for example `operant.webrizen.com`).
+One Vercel project serves both the SPA and the API from the same domain (currently `siemmi.com`).
 
 ## 1. Supabase
 1. Create a project, region **Mumbai (ap-south-1)**.
