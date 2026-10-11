@@ -129,7 +129,7 @@ export function Skeleton({ className }: { className?: string }) {
 }
 
 /** The Operant mark, tinted with the current text color. */
-export function Logo({ className, src = "/logo.png" }: { className?: string; src?: string }) {
+export function Logo({ className, src = "/icon.svg" }: { className?: string; src?: string }) {
   return (
     <span
       role="img"
@@ -138,8 +138,8 @@ export function Logo({ className, src = "/logo.png" }: { className?: string; src
       style={{
         maskImage: `url(${src})`,
         WebkitMaskImage: `url(${src})`,
-        maskSize: "170%",
-        WebkitMaskSize: "170%",
+        maskSize: "100%",
+        WebkitMaskSize: "100%",
         maskPosition: "center",
         WebkitMaskPosition: "center",
         maskRepeat: "no-repeat",
