@@ -1,8 +1,6 @@
-import { getRequestListener } from "@hono/node-server";
 import { createCloudApp } from "./app.ts";
 import { loadEnv } from "./env.ts";
 
-/** Production entry: a Vercel Node.js function (bundled by scripts/build-vercel.mjs). */
+/** Production entry: the `cloud` service in vercel.json (Vercel's Hono preset serves the default export). */
 const app = await createCloudApp(loadEnv());
-
-export default getRequestListener(app.fetch);
+export default app;

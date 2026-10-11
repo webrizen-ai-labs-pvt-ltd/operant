@@ -2,6 +2,7 @@
 //   .vercel/output/static            the SPA (apps/web/dist)
 //   .vercel/output/functions/api.func one bundled Node.js function (Hono API)
 //   .vercel/output/config.json        routing: API/auth/webhooks → function, everything else → SPA
+// Kept as the fallback to the services setup in vercel.json, and as the CI bundle check.
 import { execSync } from "node:child_process";
 import { cpSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { build } from "esbuild";
@@ -15,7 +16,7 @@ cpSync("apps/web/dist", `${out}/static`, { recursive: true });
 const fn = `${out}/functions/api.func`;
 mkdirSync(fn, { recursive: true });
 await build({
-  entryPoints: ["apps/cloud/src/index.ts"],
+  entryPoints: ["apps/cloud/src/node.ts"],
   outfile: `${fn}/index.mjs`,
   bundle: true,
   platform: "node",

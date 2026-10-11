@@ -30,25 +30,41 @@ In **Platform → Applications → Register application**:
 Copy the client ID, client secret and webhook signing secret.
 
 ## 3. Vercel
-1. Import the GitHub repo and leave **Root Directory** as the repo root.
-2. **Build command:** `pnpm build:vercel`. **Framework preset:** Other.
-3. Environment variables (Production). See `apps/cloud/.env.example` for descriptions.
+One Vercel project serves everything. `vercel.json` at the repo root defines four services and routes by hostname:
+
+| Address | Goes to |
+|---|---|
+| `app.<domain>` | `web` (staff app); `/api`, `/auth` and `/webhooks` go to `cloud` (the API) |
+| `portal.<domain>` | `portal` (client portal); `/api` goes to `cloud` |
+| anything else (`<domain>`, `www.<domain>`, `*.vercel.app`) | `marketing` |
+
+1. Import the GitHub repo. Leave **Root Directory** as the repo root and the preset as **Services**.
+2. Environment variables (Production). See `apps/cloud/.env.example` for descriptions.
 
    | Variable | Value |
    |---|---|
    | `NODE_ENV` | `production` |
-   | `APP_URL` | `https://<domain>` |
+   | `APP_URL` | `https://app.<domain>` |
+   | `PORTAL_URL` | `https://portal.<domain>` |
    | `SESSION_SECRET` | 32+ random characters (`openssl rand -base64 32`) |
    | `WEBRIZEN_SSO_CLIENT_ID` / `WEBRIZEN_SSO_CLIENT_SECRET` | from SSO |
    | `WEBRIZEN_WEBHOOK_SECRET` | from SSO (`whsec_…`) |
    | `DATABASE_URL` | Supabase **transaction pooler** URL |
    | `SUPABASE_URL` / `SUPABASE_SECRET_KEY` / `SUPABASE_JWT_SECRET` / `SUPABASE_PUBLISHABLE_KEY` | from Supabase (the publishable key lets browsers connect to Realtime) |
-   | `RESEND_API_KEY` / `EMAIL_FROM` | from Resend, for mention, message, assignment and leave emails (optional) |
+   | `RESEND_API_KEY` / `EMAIL_FROM` | from Resend, for emails and for organizations' own sending domains (optional) |
    | `CRON_SECRET` | random string (also used in the pg_cron jobs) |
    | `ENCRYPTION_KEY` | 32+ random characters; encrypts tenants' Razorpay secrets. Set it once and keep it (defaults to SESSION_SECRET) |
+   | `PUBLIC_SITE_URL` | `https://<domain>` (marketing: canonical links, sitemap, share images) |
+   | `PUBLIC_APP_URL` / `PUBLIC_PORTAL_URL` | same as `APP_URL` / `PORTAL_URL` (marketing links) |
+   | `PUBLIC_CONTACT_EMAIL` | shown in the marketing footer (optional) |
 
-4. Add the custom domain.
-5. Enable the scheduled jobs at the bottom of `supabase-setup.sql`: nightly member sync, and the daily finance job (`/api/cron/finance`: retainers and overdue reminders).
+3. Deploy, then add three domains to the project: `<domain>`, `app.<domain>` and `portal.<domain>`.
+4. In the SSO, the redirect is `https://app.<domain>/auth/callback` and the webhook is `https://app.<domain>/webhooks/webrizen`.
+5. Enable the scheduled jobs at the bottom of `supabase-setup.sql` (they call `https://app.<domain>/api/cron/...`): nightly member sync, and the daily finance job.
+
+No service calls another one server to server, so there are no service bindings.
+
+Fallback without services: delete `vercel.json`, set the preset to **Other** and the build command to `pnpm build:vercel`. That deploys the staff app and API only, as one function.
 
 ## Every release
 - If the schema changed, run `pnpm db:migrate` against the direct URL **before** deploying.
@@ -56,12 +72,4 @@ Copy the client ID, client secret and webhook signing secret.
 
 ## Marketing site (`apps/marketing`)
 
-A static Astro site: every page is plain HTML, so any static host works (a separate Vercel project is simplest).
-
-- Root directory: `apps/marketing`, build command `pnpm build`, output directory `dist`.
-- Environment variables (all optional, read at build time):
-  - `PUBLIC_SITE_URL`: the site's own address, for canonical links, the sitemap and share images (default `https://operant.webrizen.com`).
-  - `PUBLIC_APP_URL`: where "Get started" and "Sign in" go (the web app).
-  - `PUBLIC_PORTAL_URL`: the client portal.
-  - `PUBLIC_CONTACT_EMAIL`: shown in the footer and used for "Book a demo".
-- Update `public/robots.txt` if the site's address changes.
+A static Astro site, deployed as the `marketing` service above. Its `PUBLIC_*` variables are read at build time. Update `public/robots.txt` if the site's address changes.
