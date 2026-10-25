@@ -1,7 +1,7 @@
 import { can, INDIAN_STATES, isValidGstin, PILLARS, type Pillar, stateOfGstin, type TermKey } from "@operant/core";
 import { Avatar, Badge, Button, ButtonGroup, ButtonGroupItem, Card, cn, Field, Input, Label, Select, Textarea, ToggleBase } from "@operant/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ImageUp, Moon, Sun, SunMoon, Trash2 } from "lucide-react";
+import { Check, ImageUp, Moon, Pencil, Sun, SunMoon, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/app-shell.tsx";
@@ -23,10 +23,11 @@ export function OrgSettingsPage({ me }: { me: Me }) {
   useEffect(() => {
     if (finance && !details) {
       const f = finance.settings;
-      setDetails({ logo: f.logo ?? null, gstin: f.gstin ?? "", stateCode: f.stateCode ?? "", address: f.address ?? "", email: f.email ?? "", phone: f.phone ?? "" });
+      setDetails({ legalName: f.legalName ?? "", logo: f.logo ?? null, gstin: f.gstin ?? "", stateCode: f.stateCode ?? "", address: f.address ?? "", email: f.email ?? "", phone: f.phone ?? "" });
     }
   }, [finance, details]);
   const gstinValid = !details?.gstin || isValidGstin(details.gstin);
+  const [editingName, setEditingName] = useState(false);
 
   const save = useMutation({
     mutationFn: async () => {
@@ -35,6 +36,7 @@ export function OrgSettingsPage({ me }: { me: Me }) {
         await api("finance/settings", {
           method: "PATCH",
           body: JSON.stringify({
+            legalName: details.legalName.trim() || null,
             logo: details.logo,
             gstin: details.gstin || null,
             stateCode: details.stateCode || null,
@@ -73,6 +75,40 @@ export function OrgSettingsPage({ me }: { me: Me }) {
           </div>
           <Badge className="ml-auto">{me.settings.currency}</Badge>
         </div>
+        {details ? (
+          <div className="mt-5 border-t border-secondary pt-4">
+            {editingName ? (
+              <div className="flex flex-wrap items-end gap-2">
+                <Field label="Name on invoices, quotes and receipts" hint="Your registered business name. Leave blank to use the organization name." className="min-w-0 flex-1">
+                  <Input
+                    value={details.legalName}
+                    onChange={(e) => setDetails({ ...details, legalName: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && setEditingName(false)}
+                    placeholder={me.org.name}
+                    maxLength={200}
+                    autoFocus
+                  />
+                </Field>
+                <Button className="mb-6" onClick={() => setEditingName(false)}>
+                  <Check /> Done
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-tertiary">Name on invoices, quotes and receipts</div>
+                  <div className="truncate font-medium">{details.legalName.trim() || me.org.name}</div>
+                </div>
+                {canManage ? (
+                  <Button size="sm" variant="secondary" onClick={() => setEditingName(true)}>
+                    <Pencil /> Edit
+                  </Button>
+                ) : null}
+              </div>
+            )}
+            <p className="mt-2 text-xs text-tertiary">The organization name above comes from your Webrizen account. Changes here are saved with Save changes.</p>
+          </div>
+        ) : null}
       </Card>
 
       {details ? <BusinessDetailsCard details={details} onChange={setDetails} canManage={canManage} gstinValid={gstinValid} /> : null}
@@ -167,6 +203,8 @@ export function OrgSettingsPage({ me }: { me: Me }) {
 }
 
 interface BusinessDetails {
+  /** The business name printed on documents; blank uses the organization name. */
+  legalName: string;
   /** Data URL, or null for no logo. */
   logo: string | null;
   gstin: string;
@@ -188,7 +226,7 @@ function BusinessDetailsCard({
   canManage: boolean;
   gstinValid: boolean;
 }) {
-  const set = (k: Exclude<keyof BusinessDetails, "logo">, v: string) => {
+  const set = (k: Exclude<keyof BusinessDetails, "logo" | "legalName">, v: string) => {
     const next = { ...details, [k]: v };
     // A GSTIN's first two digits are the state.
     if (k === "gstin" && v && isValidGstin(v)) next.stateCode = stateOfGstin(v);
