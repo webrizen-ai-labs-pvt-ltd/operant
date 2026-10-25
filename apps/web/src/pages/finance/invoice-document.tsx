@@ -20,10 +20,10 @@ function SellerBlock({ seller, logoSlot }: { seller: Seller; logoSlot?: boolean 
   return (
     <div className="flex min-w-0 items-center gap-5">
       {seller.logo ? (
-        <img src={seller.logo} alt="" className="h-24 w-auto max-w-[200px] shrink-0 object-contain object-left" />
+        <img src={seller.logo} alt="" className="h-32 w-auto max-w-[260px] shrink-0 object-contain object-left" />
       ) : logoSlot ? (
         // Staff see where the logo goes; it never prints.
-        <div className="flex size-24 shrink-0 items-center justify-center rounded-md border border-dashed border-[#d6cdbf] p-2 text-center text-[11px] text-[#8a8178] print:hidden">Logo (add in Settings)</div>
+        <div className="flex size-32 shrink-0 items-center justify-center rounded-md border border-dashed border-[#d6cdbf] p-2 text-center text-[11px] text-[#8a8178] print:hidden">Logo (add in Settings)</div>
       ) : null}
       <div className="min-w-0">
         <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
