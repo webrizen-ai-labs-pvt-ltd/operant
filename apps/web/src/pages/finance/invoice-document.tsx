@@ -15,25 +15,27 @@ export const docTitle = (kind: DocKind, sellerGstin: string | null) => (kind ===
 const fmtDate = (d: string | null) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 const state = (code: string | null) => (code ? `${INDIAN_STATES[code] ?? code} (${code})` : null);
 
-/** Top left of every document: logo, name, address, contact details, then tax registration. */
+/** Top left of every document: the logo, with name, address, contact details and tax registration beside it. */
 function SellerBlock({ seller, logoSlot }: { seller: Seller; logoSlot?: boolean }) {
   return (
-    <div className="max-w-sm">
+    <div className="flex min-w-0 items-center gap-5">
       {seller.logo ? (
-        <img src={seller.logo} alt="" className="mb-3 h-14 max-w-[220px] object-contain object-left" />
+        <img src={seller.logo} alt="" className="h-24 w-auto max-w-[200px] shrink-0 object-contain object-left" />
       ) : logoSlot ? (
         // Staff see where the logo goes; it never prints.
-        <div className="mb-3 flex h-14 w-[140px] items-center justify-center rounded-md border border-dashed border-[#d6cdbf] text-[11px] text-[#8a8178] print:hidden">Logo (add in Settings)</div>
+        <div className="flex size-24 shrink-0 items-center justify-center rounded-md border border-dashed border-[#d6cdbf] p-2 text-center text-[11px] text-[#8a8178] print:hidden">Logo (add in Settings)</div>
       ) : null}
-      <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
-      {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
-      {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.phone, seller.email].filter(Boolean).join(" · ")}</div> : null}
-      {seller.gstin || seller.pan ? (
-        <div className="mt-1 space-x-3 text-[#5f574e]">
-          {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
-          {seller.pan ? <span>PAN <b className="font-mono text-[#1a1715]">{seller.pan}</b></span> : null}
-        </div>
-      ) : null}
+      <div className="min-w-0">
+        <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
+        {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
+        {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.phone, seller.email].filter(Boolean).join(" · ")}</div> : null}
+        {seller.gstin || seller.pan ? (
+          <div className="space-x-3 text-[#5f574e]">
+            {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
+            {seller.pan ? <span>PAN <b className="font-mono text-[#1a1715]">{seller.pan}</b></span> : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -85,16 +87,23 @@ export function InvoiceDocument({
           <span className="-rotate-12 rounded-lg border-4 border-[#b81f33]/40 px-8 py-2 font-display text-6xl font-bold text-[#b81f33]/30">VOID</span>
         </div>
       ) : null}
-      {doc.status === "paid" ? (
-        <div className="pointer-events-none absolute right-10 top-28 -rotate-12 rounded-lg border-4 border-[#2e8b6e]/50 px-5 py-1 font-display text-3xl font-bold text-[#2e8b6e]/60">PAID</div>
-      ) : null}
-
-      <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#1a1715] pb-5">
+      <header className="pb-5">
         <SellerBlock seller={seller} logoSlot={logoSlot} />
-        <div className="text-right">
-          <div className="font-display text-2xl font-bold uppercase tracking-wide">{docTitle(doc.kind, seller.gstin)}</div>
-          <div className="mt-1 font-mono text-base">{doc.number ?? "Draft"}</div>
-          <dl className="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 text-[#5f574e]">
+      </header>
+
+      {/* The document's name, between two rules. */}
+      <div className="relative border-y-2 border-[#1a1715] py-2.5 text-center font-display text-xl font-bold uppercase tracking-wide">
+        {docTitle(doc.kind, seller.gstin)}
+        {doc.status === "paid" ? (
+          <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 -rotate-12 rounded-lg border-4 border-[#2e8b6e]/50 px-4 font-display text-2xl font-bold text-[#2e8b6e]/60">PAID</span>
+        ) : null}
+      </div>
+
+      <section className="mt-5 grid grid-cols-2 gap-6">
+        <div>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-4 text-[#5f574e]">
+            <dt>{doc.kind === "quote" ? "Quotation no." : doc.kind === "credit_note" ? "Credit note no." : "Invoice no."}</dt>
+            <dd className="font-mono font-semibold text-[#1a1715]">{doc.number ?? "Draft"}</dd>
             <dt>Date</dt>
             <dd className="text-[#1a1715]">{fmtDate(doc.issueDate)}</dd>
             {doc.dueDate && doc.kind !== "credit_note" ? (
@@ -110,11 +119,9 @@ export function InvoiceDocument({
               </>
             ) : null}
           </dl>
+          {doc.supplyType === "export" ? <div className="mt-1 text-[#5f574e]">Export of services, zero-rated (under LUT)</div> : null}
         </div>
-      </header>
-
-      <section className="mt-5 grid gap-6 sm:grid-cols-2">
-        <div>
+        <div className="text-right">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Bill to</div>
           <div className="mt-1 font-semibold">{client.legalName ?? client.name}</div>
           {client.billingAddress ? <div className="whitespace-pre-line text-[#5f574e]">{client.billingAddress}</div> : null}
@@ -127,9 +134,6 @@ export function InvoiceDocument({
             <div className="text-[#5f574e]">{state(client.stateCode)}</div>
           ) : null}
         </div>
-        {doc.supplyType === "export" ? (
-          <div className="self-end text-right text-[#5f574e]">Export of services, zero-rated (under LUT)</div>
-        ) : null}
       </section>
 
       <table className="mt-6 w-full border-collapse text-left">
