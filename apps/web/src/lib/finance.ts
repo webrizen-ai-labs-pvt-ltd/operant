@@ -217,7 +217,7 @@ export interface ClientRow extends ClientInfo {
 }
 
 export const KIND_LABEL: Record<DocKind, { one: string; many: string }> = {
-  invoice: { one: "Invoice", many: "Invoices" },
+  invoice: { one: "Invoice", many: "Billing" },
   quote: { one: "Quote", many: "Quotes" },
   credit_note: { one: "Credit note", many: "Credit notes" },
 };

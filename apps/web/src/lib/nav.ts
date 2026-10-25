@@ -81,7 +81,7 @@ export const MAIN_NAV: NavItem[] = [
     hint: "Clients, invoices, payments",
     children: [
       { to: "/finance", label: "Overview", exact: true },
-      { to: "/finance/invoices", label: "Invoices", also: (p) => p.startsWith("/finance/new") },
+      { to: "/finance/invoices", label: "Billing", also: (p) => p.startsWith("/finance/new") },
       { to: "/finance/quotes", label: "Quotes" },
       { to: "/finance/clients", label: "Clients" },
       { to: "/finance/payments", label: "Payments", also: (p) => p.startsWith("/finance/receipts") },

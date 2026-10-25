@@ -166,7 +166,7 @@ export function DocumentsPage({ me, kind }: { me: Me; kind: "invoice" | "quote" 
         {!isLoading && docs.length === 0 ? (
           <EmptyState
             icon={<FileText />}
-            title={status || deferred ? "Nothing matches" : `No ${label.many.toLowerCase()} yet`}
+            title={status || deferred ? "Nothing matches" : `No ${label.one.toLowerCase()}s yet`}
             description={kind === "invoice" ? "Create an invoice, or complete a billable milestone and a draft appears here." : undefined}
           />
         ) : (
