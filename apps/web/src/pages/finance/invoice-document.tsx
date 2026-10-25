@@ -28,7 +28,8 @@ function SellerBlock({ seller, logoSlot }: { seller: Seller; logoSlot?: boolean 
       <div className="min-w-0">
         <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
         {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
-        {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.phone, seller.email].filter(Boolean).join(" · ")}</div> : null}
+        {seller.phone ? <div className="text-[#5f574e]">{seller.phone}</div> : null}
+        {seller.email ? <div className="text-[#5f574e]">{seller.email}</div> : null}
         {seller.gstin || seller.pan ? (
           <div className="space-x-3 text-[#5f574e]">
             {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
