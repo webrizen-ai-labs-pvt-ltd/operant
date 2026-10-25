@@ -9,8 +9,37 @@ import { type ClientInfo, type Doc, type DocKind, type Line, money, PAYMENT_METH
 
 const TITLE: Record<DocKind, string> = { invoice: "Tax invoice", quote: "Quotation", credit_note: "Credit note" };
 
+/** A seller without a GSTIN can't issue a tax invoice; theirs is a bill of supply. */
+export const docTitle = (kind: DocKind, sellerGstin: string | null) => (kind === "invoice" && !sellerGstin ? "Bill of supply" : TITLE[kind]);
+
 const fmtDate = (d: string | null) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
 const state = (code: string | null) => (code ? `${INDIAN_STATES[code] ?? code} (${code})` : null);
+
+/** Top left of every document: logo, name, address, contact details, then tax registration. */
+function SellerBlock({ seller, logoSlot }: { seller: Seller; logoSlot?: boolean }) {
+  return (
+    <div className="max-w-sm">
+      {seller.logo ? (
+        <img src={seller.logo} alt="" className="mb-3 h-14 max-w-[220px] object-contain object-left" />
+      ) : logoSlot ? (
+        // Staff see where the logo goes; it never prints.
+        <div className="mb-3 flex h-14 w-[140px] items-center justify-center rounded-md border border-dashed border-[#d6cdbf] text-[11px] text-[#8a8178] print:hidden">Logo (add in Settings)</div>
+      ) : null}
+      <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
+      {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
+      {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.phone, seller.email].filter(Boolean).join(" · ")}</div> : null}
+      {seller.gstin || seller.pan ? (
+        <div className="mt-1 space-x-3 text-[#5f574e]">
+          {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
+          {seller.pan ? <span>PAN <b className="font-mono text-[#1a1715]">{seller.pan}</b></span> : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/* Line tables: a row rule plus a faint rule between columns. */
+const ROW = "[&>*]:px-2 [&>*:first-child]:pl-0 [&>*:last-child]:pr-0 [&>*+*]:border-l [&>*+*]:border-[#1a1715]/10";
 
 type DocLike = Pick<
   Doc,
@@ -23,6 +52,7 @@ export function InvoiceDocument({
   seller,
   client,
   receipts = [],
+  logoSlot,
   className,
 }: {
   doc: DocLike;
@@ -31,6 +61,8 @@ export function InvoiceDocument({
   client: ClientInfo;
   /** A quote's receipts, or the receipts that settled a final invoice. */
   receipts?: Receipt[];
+  /** Show an empty logo placeholder when the org has none (staff app only). */
+  logoSlot?: boolean;
   className?: string;
 }) {
   const m = (p: number) => money(p, doc.currency);
@@ -58,18 +90,9 @@ export function InvoiceDocument({
       ) : null}
 
       <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#1a1715] pb-5">
-        <div className="max-w-sm">
-          {seller.logo ? <img src={seller.logo} alt="" className="mb-3 max-h-14 max-w-[220px] object-contain object-left" /> : null}
-          <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
-          {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
-          <div className="mt-1 space-x-3 text-[#5f574e]">
-            {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
-            {seller.pan ? <span>PAN <b className="font-mono text-[#1a1715]">{seller.pan}</b></span> : null}
-          </div>
-          {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.email, seller.phone].filter(Boolean).join(" · ")}</div> : null}
-        </div>
+        <SellerBlock seller={seller} logoSlot={logoSlot} />
         <div className="text-right">
-          <div className="font-display text-2xl font-bold uppercase tracking-wide">{doc.kind === "invoice" && !seller.gstin ? "Invoice" : TITLE[doc.kind]}</div>
+          <div className="font-display text-2xl font-bold uppercase tracking-wide">{docTitle(doc.kind, seller.gstin)}</div>
           <div className="mt-1 font-mono text-base">{doc.number ?? "Draft"}</div>
           <dl className="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 text-[#5f574e]">
             <dt>Date</dt>
@@ -111,30 +134,30 @@ export function InvoiceDocument({
 
       <table className="mt-6 w-full border-collapse text-left">
         <thead>
-          <tr className="border-y border-[#1a1715]/80 text-[11px] uppercase tracking-wider text-[#5f574e]">
-            <th className="py-2 pr-2 font-semibold">#</th>
-            <th className="py-2 pr-2 font-semibold">Description</th>
-            <th className="py-2 pr-2 font-semibold">HSN/SAC</th>
-            <th className="py-2 pr-2 text-right font-semibold">Qty</th>
-            <th className="py-2 pr-2 text-right font-semibold">Rate</th>
-            {hasDiscount ? <th className="py-2 pr-2 text-right font-semibold">Disc.</th> : null}
-            {doc.supplyType !== "export" ? <th className="py-2 pr-2 text-right font-semibold">GST</th> : null}
+          <tr className={cn(ROW, "border-y border-[#1a1715]/80 text-[11px] uppercase tracking-wider text-[#5f574e]")}>
+            <th className="py-2 font-semibold">#</th>
+            <th className="py-2 font-semibold">Description</th>
+            <th className="py-2 font-semibold">HSN/SAC</th>
+            <th className="py-2 text-right font-semibold">Qty</th>
+            <th className="py-2 text-right font-semibold">Rate</th>
+            {hasDiscount ? <th className="py-2 text-right font-semibold">Disc.</th> : null}
+            {doc.supplyType !== "export" ? <th className="py-2 text-right font-semibold">GST</th> : null}
             <th className="py-2 text-right font-semibold">Amount</th>
           </tr>
         </thead>
         <tbody>
           {lines.map((l, i) => (
-            <tr key={l.id ?? i} className="border-b border-[#e2dace] align-top">
-              <td className="py-2 pr-2 text-[#8a8178]">{i + 1}</td>
-              <td className="py-2 pr-2 whitespace-pre-line">{l.description}</td>
-              <td className="py-2 pr-2 font-mono text-xs">{l.hsnSac ?? ""}</td>
-              <td className="py-2 pr-2 text-right font-mono">
+            <tr key={l.id ?? i} className={cn(ROW, "border-b border-[#e2dace] align-top")}>
+              <td className="py-2 text-[#8a8178]">{i + 1}</td>
+              <td className="py-2 whitespace-pre-line">{l.description}</td>
+              <td className="py-2 font-mono text-xs">{l.hsnSac ?? ""}</td>
+              <td className="py-2 text-right font-mono">
                 {Number(l.quantity)}
                 {l.unit && l.unit !== "unit" ? <span className="text-[#8a8178]"> {l.unit}</span> : null}
               </td>
-              <td className="py-2 pr-2 text-right font-mono">{m(l.unitPrice)}</td>
-              {hasDiscount ? <td className="py-2 pr-2 text-right font-mono">{l.discountPct ? `${Number(l.discountPct)}%` : ""}</td> : null}
-              {doc.supplyType !== "export" ? <td className="py-2 pr-2 text-right font-mono">{Number(l.taxRate)}%</td> : null}
+              <td className="py-2 text-right font-mono">{m(l.unitPrice)}</td>
+              {hasDiscount ? <td className="py-2 text-right font-mono">{l.discountPct ? `${Number(l.discountPct)}%` : ""}</td> : null}
+              {doc.supplyType !== "export" ? <td className="py-2 text-right font-mono">{Number(l.taxRate)}%</td> : null}
               <td className="py-2 text-right font-mono">{m(l.amount ?? 0)}</td>
             </tr>
           ))}
@@ -268,31 +291,29 @@ export function InvoiceDocument({
         </section>
       ) : null}
 
-      {doc.notes || doc.terms ? (
-        <section className="mt-6 grid gap-4 text-[#5f574e] sm:grid-cols-2">
-          {doc.notes ? (
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Notes</div>
-              <div className="whitespace-pre-line">{doc.notes}</div>
-            </div>
-          ) : null}
-          {doc.terms ? (
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Terms</div>
-              <div className="whitespace-pre-line">{doc.terms}</div>
-            </div>
-          ) : null}
+      {doc.notes ? (
+        <section className="mt-6 text-[#5f574e]">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Notes</div>
+          <div className="whitespace-pre-line">{doc.notes}</div>
         </section>
       ) : null}
 
       <footer className="mt-10 flex items-end justify-between gap-6 text-xs text-[#8a8178]">
-        <span>{doc.kind === "invoice" ? "This is a computer-generated invoice." : "This is a computer-generated document."}</span>
+        <span>{doc.kind === "invoice" ? `This is a computer-generated ${docTitle(doc.kind, seller.gstin).toLowerCase()}.` : "This is a computer-generated document."}</span>
         <span className="text-right">
           For {seller.legalName ?? seller.name}
           <br />
           <span className="mt-8 inline-block border-t border-[#8a8178] pt-1">Authorised signatory</span>
         </span>
       </footer>
+
+      {/* Terms belong to the offer: printed on quotations, never on invoices or bills of supply. */}
+      {doc.kind === "quote" && doc.terms ? (
+        <section className="mt-8 border-t border-[#1a1715]/15 pt-4 text-xs text-[#5f574e]">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Terms and conditions</div>
+          <div className="mt-1 whitespace-pre-line">{doc.terms}</div>
+        </section>
+      ) : null}
     </article>
   );
 }
@@ -335,16 +356,7 @@ export function ReceiptDocument({
       ) : null}
 
       <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#1a1715] pb-5">
-        <div className="max-w-sm">
-          {seller.logo ? <img src={seller.logo} alt="" className="mb-3 max-h-14 max-w-[220px] object-contain object-left" /> : null}
-          <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
-          {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
-          <div className="mt-1 space-x-3 text-[#5f574e]">
-            {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
-            {seller.pan ? <span>PAN <b className="font-mono text-[#1a1715]">{seller.pan}</b></span> : null}
-          </div>
-          {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.email, seller.phone].filter(Boolean).join(" · ")}</div> : null}
-        </div>
+        <SellerBlock seller={seller} />
         <div className="text-right">
           <div className="font-display text-2xl font-bold uppercase tracking-wide">{seller.gstin ? "Receipt voucher" : "Receipt"}</div>
           <div className="mt-1 font-mono text-base">{receipt.number}</div>
@@ -384,19 +396,19 @@ export function ReceiptDocument({
 
       <table className="mt-6 w-full border-collapse text-left">
         <thead>
-          <tr className="border-y border-[#1a1715]/80 text-[11px] uppercase tracking-wider text-[#5f574e]">
-            <th className="py-2 pr-2 font-semibold">#</th>
-            <th className="py-2 pr-2 font-semibold">For</th>
-            <th className="py-2 pr-2 font-semibold">HSN/SAC</th>
+          <tr className={cn(ROW, "border-y border-[#1a1715]/80 text-[11px] uppercase tracking-wider text-[#5f574e]")}>
+            <th className="py-2 font-semibold">#</th>
+            <th className="py-2 font-semibold">For</th>
+            <th className="py-2 font-semibold">HSN/SAC</th>
             {quote.supplyType !== "export" ? <th className="py-2 text-right font-semibold">GST</th> : null}
           </tr>
         </thead>
         <tbody>
           {lines.map((l, i) => (
-            <tr key={l.id ?? i} className="border-b border-[#e2dace] align-top">
-              <td className="py-2 pr-2 text-[#8a8178]">{i + 1}</td>
-              <td className="py-2 pr-2 whitespace-pre-line">{l.description}</td>
-              <td className="py-2 pr-2 font-mono text-xs">{l.hsnSac ?? ""}</td>
+            <tr key={l.id ?? i} className={cn(ROW, "border-b border-[#e2dace] align-top")}>
+              <td className="py-2 text-[#8a8178]">{i + 1}</td>
+              <td className="py-2 whitespace-pre-line">{l.description}</td>
+              <td className="py-2 font-mono text-xs">{l.hsnSac ?? ""}</td>
               {quote.supplyType !== "export" ? <td className="py-2 text-right font-mono">{Number(l.taxRate)}%</td> : null}
             </tr>
           ))}

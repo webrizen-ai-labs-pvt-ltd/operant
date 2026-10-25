@@ -244,13 +244,13 @@ function Editor({ me, kind, initial }: { me: Me; kind: DocKind; initial?: DocDet
   const [addingClient, setAddingClient] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // New documents start with the organisation's default notes and terms.
+  // New documents start with the organisation's default notes; quotes also with its default terms.
   useEffect(() => {
     if (!initial && settings) {
       setNotes((n) => n || settings.settings.notes || "");
-      setTerms((t) => t || settings.settings.terms || "");
+      if (kind === "quote") setTerms((t) => t || settings.settings.terms || "");
     }
-  }, [initial, settings]);
+  }, [initial, settings, kind]);
   useEffect(() => {
     if (!initial) setLines((l) => (l.length === 1 && !l[0]!.description ? [emptyLine(defaultRate)] : l));
   }, [defaultRate, initial]);
@@ -301,7 +301,12 @@ function Editor({ me, kind, initial }: { me: Me; kind: DocKind; initial?: DocDet
       <Link to={kind === "quote" ? "/finance/quotes" : "/finance/invoices"} className="inline-flex items-center gap-1 text-sm text-tertiary hover:text-primary">
         <ArrowLeft className="size-4" /> {KIND_LABEL[kind === "credit_note" ? "invoice" : kind].many}
       </Link>
-      <PageHeader title={initial ? `Draft ${KIND_LABEL[kind].one.toLowerCase()}` : `New ${KIND_LABEL[kind].one.toLowerCase()}`} description={settings && !settings.settings.gstin ? "You're not GST-registered, so this goes out as an invoice without GST. Add a GSTIN in Finance settings if you register." : undefined} />
+      <PageHeader title={initial ? `Draft ${KIND_LABEL[kind].one.toLowerCase()}` : `New ${KIND_LABEL[kind].one.toLowerCase()}`} description={
+          settings && !settings.settings.gstin
+            ? `You're not GST-registered, so this goes out without GST${kind === "invoice" ? " as a bill of supply" : ""}. Add a GST number in Settings → Organization if you register.`
+            : undefined
+        }
+      />
 
       <Card className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Client" className="lg:col-span-2" hint={client ? (supplyType === "intra" ? "Same state: CGST + SGST" : supplyType === "inter" ? "Different state: IGST" : `Export in ${client.currency}, zero-rated`) : undefined}>
@@ -345,13 +350,15 @@ function Editor({ me, kind, initial }: { me: Me; kind: DocKind; initial?: DocDet
         <LineEditor lines={lines} onChange={setLines} supplyType={supplyType} currency={currency} roundOff={settings?.settings.roundOff ?? true} gstRegistered={!settings || Boolean(settings.settings.gstin)} />
       </Card>
 
-      <Card className="grid gap-4 p-5 sm:grid-cols-2">
+      <Card className={cn("grid gap-4 p-5", kind === "quote" && "sm:grid-cols-2")}>
         <Field label="Notes" hint="Shown on the document, e.g. a thank-you or PO number">
           <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={4000} />
         </Field>
-        <Field label="Terms">
-          <Textarea value={terms} onChange={(e) => setTerms(e.target.value)} maxLength={4000} />
-        </Field>
+        {kind === "quote" ? (
+          <Field label="Terms and conditions" hint="Printed at the bottom of the quotation, not on the invoice">
+            <Textarea value={terms} onChange={(e) => setTerms(e.target.value)} maxLength={4000} />
+          </Field>
+        ) : null}
       </Card>
 
       {error ? <p className="text-sm text-error-primary">{error}</p> : null}
@@ -585,7 +592,7 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
           <div className="overflow-x-auto rounded-xl border border-secondary shadow-[0_24px_64px_-32px_rgb(0_0_0/0.5)]">
-            <InvoiceDocument doc={d} lines={detail.lines} seller={detail.seller} client={detail.client} receipts={detail.receipts} className="min-w-[640px]" />
+            <InvoiceDocument doc={d} lines={detail.lines} seller={detail.seller} client={detail.client} receipts={detail.receipts} logoSlot className="min-w-[640px]" />
           </div>
           {detail.installments ? <InstallmentsCard me={me} detail={detail} /> : null}
           <Card className="p-4 sm:p-6 print:hidden">

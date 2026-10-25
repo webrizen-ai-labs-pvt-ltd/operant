@@ -83,7 +83,7 @@ export function PublicInvoicePage() {
   const plan = data.installments;
   // With a plan, the headline is the instalment that's due now.
   const next = plan?.rows.find((r) => r.status === "billed") ?? plan?.rows.find((r) => r.status === "scheduled");
-  const title = { invoice: "Invoice", quote: "Quote", credit_note: "Credit note" }[d.kind];
+  const title = d.kind === "invoice" && !data.seller.gstin ? "Bill of supply" : { invoice: "Invoice", quote: "Quote", credit_note: "Credit note" }[d.kind];
 
   return (
     <div className="min-h-dvh bg-secondary pb-16">
