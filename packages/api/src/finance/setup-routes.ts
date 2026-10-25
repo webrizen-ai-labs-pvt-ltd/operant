@@ -62,6 +62,7 @@ const settingsInput = z
     invoicePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),
     quotePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),
     creditNotePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),
+    receiptPrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),
     defaultDueDays: z.number().int().min(0).max(365),
     terms: text(4000),
     notes: text(2000),

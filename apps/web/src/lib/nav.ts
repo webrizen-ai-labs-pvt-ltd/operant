@@ -84,7 +84,7 @@ export const MAIN_NAV: NavItem[] = [
       { to: "/finance/invoices", label: "Invoices", also: (p) => p.startsWith("/finance/new") },
       { to: "/finance/quotes", label: "Quotes" },
       { to: "/finance/clients", label: "Clients" },
-      { to: "/finance/payments", label: "Payments" },
+      { to: "/finance/payments", label: "Payments", also: (p) => p.startsWith("/finance/receipts") },
       { to: "/finance/retainers", label: "Retainers" },
       { to: "/finance/settings", label: "Finance settings" },
     ],

@@ -1,9 +1,9 @@
 import { amountInWords, INDIAN_STATES } from "@operant/core";
 import { cn } from "@operant/ui";
-import { type ClientInfo, type Doc, type DocKind, type Line, money, type Seller } from "../../lib/finance.ts";
+import { type ClientInfo, type Doc, type DocKind, type Line, money, PAYMENT_METHOD_LABEL, type Receipt, type Seller } from "../../lib/finance.ts";
 
 /*
- * The printable document (tax invoice, quote or credit note). Used in the app
+ * The printable documents (tax invoice, quote, credit note and receipt). Used in the app
  * and on the client's public page. Prints on A4 via the browser's print to PDF.
  */
 
@@ -17,7 +17,22 @@ type DocLike = Pick<
   "kind" | "number" | "status" | "issueDate" | "dueDate" | "currency" | "placeOfSupply" | "supplyType" | "subtotal" | "discountTotal" | "taxableTotal" | "cgst" | "sgst" | "igst" | "roundOff" | "total" | "amountPaid" | "notes" | "terms"
 >;
 
-export function InvoiceDocument({ doc, lines, seller, client, className }: { doc: DocLike; lines: Line[]; seller: Seller; client: ClientInfo; className?: string }) {
+export function InvoiceDocument({
+  doc,
+  lines,
+  seller,
+  client,
+  receipts = [],
+  className,
+}: {
+  doc: DocLike;
+  lines: Line[];
+  seller: Seller;
+  client: ClientInfo;
+  /** A quote's receipts, or the receipts that settled a final invoice. */
+  receipts?: Receipt[];
+  className?: string;
+}) {
   const m = (p: number) => money(p, doc.currency);
   const hasDiscount = lines.some((l) => l.discountPct > 0);
   const byRate = new Map<number, { taxable: number; tax: number }>();
@@ -29,6 +44,7 @@ export function InvoiceDocument({ doc, lines, seller, client, className }: { doc
   }
   const balance = doc.total - doc.amountPaid;
   const bank = seller.bank ?? {};
+  const live = receipts.filter((r) => !r.voidedAt);
 
   return (
     <article className={cn("invoice-doc relative bg-white p-8 text-[13px] leading-relaxed text-[#1a1715] sm:p-10", className)}>
@@ -199,7 +215,7 @@ export function InvoiceDocument({ doc, lines, seller, client, className }: { doc
           ) : null}
           <dt className="mt-1 border-t-2 border-[#1a1715] pt-2 font-display text-base font-bold">Total</dt>
           <dd className="mt-1 border-t-2 border-[#1a1715] pt-2 text-right font-mono text-base font-bold">{m(doc.total)}</dd>
-          {doc.kind === "invoice" && doc.amountPaid ? (
+          {(doc.kind === "invoice" || doc.kind === "quote") && doc.amountPaid ? (
             <>
               <dt className="text-[#5f574e]">Paid</dt>
               <dd className="text-right font-mono">−{m(doc.amountPaid)}</dd>
@@ -210,7 +226,35 @@ export function InvoiceDocument({ doc, lines, seller, client, className }: { doc
         </dl>
       </section>
 
-      {doc.kind === "invoice" && (bank.accountNumber || bank.upiId) ? (
+      {live.length ? (
+        <section className="mt-6">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">{doc.kind === "invoice" ? "Settled by payments received against the quotation" : "Payments received"}</div>
+          <table className="mt-1 w-full text-xs">
+            <thead>
+              <tr className="border-b border-[#e2dace] text-left text-[#8a8178]">
+                <th className="py-1 font-semibold">Receipt</th>
+                <th className="py-1 font-semibold">Date</th>
+                <th className="py-1 font-semibold">Mode</th>
+                <th className="py-1 text-right font-semibold">GST included</th>
+                <th className="py-1 text-right font-semibold">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono">
+              {live.map((r) => (
+                <tr key={r.id} className="border-b border-[#e2dace]/60">
+                  <td className="py-1">{r.number}</td>
+                  <td className="py-1 font-sans">{fmtDate(r.paidOn)}</td>
+                  <td className="py-1 font-sans">{PAYMENT_METHOD_LABEL[r.method] ?? r.method}</td>
+                  <td className="py-1 text-right">{m(r.cgst + r.sgst + r.igst)}</td>
+                  <td className="py-1 text-right">{m(r.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      ) : null}
+
+      {(doc.kind === "invoice" || doc.kind === "quote") && doc.status !== "paid" && (bank.accountNumber || bank.upiId) ? (
         <section className="mt-6 rounded-lg bg-[#f5f1ea] p-4">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Pay by bank transfer</div>
           <div className="mt-1 grid gap-x-6 sm:grid-cols-2">
@@ -242,6 +286,162 @@ export function InvoiceDocument({ doc, lines, seller, client, className }: { doc
 
       <footer className="mt-10 flex items-end justify-between gap-6 text-xs text-[#8a8178]">
         <span>{doc.kind === "invoice" ? "This is a computer-generated invoice." : "This is a computer-generated document."}</span>
+        <span className="text-right">
+          For {seller.legalName ?? seller.name}
+          <br />
+          <span className="mt-8 inline-block border-t border-[#8a8178] pt-1">Authorised signatory</span>
+        </span>
+      </footer>
+    </article>
+  );
+}
+
+/**
+ * A receipt for money received against a quote. For a GST-registered seller it's a receipt
+ * voucher (CGST Rules, rule 50): it names the supply, and shows the tax the amount contains.
+ */
+export function ReceiptDocument({
+  receipt,
+  receipts,
+  quote,
+  lines,
+  seller,
+  client,
+  className,
+}: {
+  receipt: Receipt;
+  /** Every receipt on the quote, for "received earlier" and the balance. */
+  receipts: Receipt[];
+  quote: Pick<Doc, "number" | "issueDate" | "currency" | "placeOfSupply" | "supplyType" | "total">;
+  lines: Line[];
+  seller: Seller;
+  client: ClientInfo;
+  className?: string;
+}) {
+  const m = (p: number) => money(p, quote.currency);
+  const tax = receipt.cgst + receipt.sgst + receipt.igst;
+  const order = receipts.findIndex((r) => r.id === receipt.id);
+  const earlier = receipts.filter((r, i) => !r.voidedAt && i < order).reduce((a, r) => a + r.amount, 0);
+  const balance = quote.total - earlier - receipt.amount;
+  const rates = [...new Set(lines.map((l) => Number(l.taxRate)))].sort((a, b) => a - b);
+  const half = rates.length === 1 ? ` @ ${rates[0]! / 2}%` : "";
+  return (
+    <article className={cn("invoice-doc relative bg-white p-8 text-[13px] leading-relaxed text-[#1a1715] sm:p-10", className)}>
+      {receipt.voidedAt ? (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <span className="-rotate-12 rounded-lg border-4 border-[#b81f33]/40 px-8 py-2 font-display text-6xl font-bold text-[#b81f33]/30">CANCELLED</span>
+        </div>
+      ) : null}
+
+      <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#1a1715] pb-5">
+        <div className="max-w-sm">
+          <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
+          {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
+          <div className="mt-1 space-x-3 text-[#5f574e]">
+            {seller.gstin ? <span>GSTIN <b className="font-mono text-[#1a1715]">{seller.gstin}</b></span> : null}
+            {seller.pan ? <span>PAN <b className="font-mono text-[#1a1715]">{seller.pan}</b></span> : null}
+          </div>
+          {seller.email || seller.phone ? <div className="text-[#5f574e]">{[seller.email, seller.phone].filter(Boolean).join(" · ")}</div> : null}
+        </div>
+        <div className="text-right">
+          <div className="font-display text-2xl font-bold uppercase tracking-wide">{seller.gstin ? "Receipt voucher" : "Receipt"}</div>
+          <div className="mt-1 font-mono text-base">{receipt.number}</div>
+          <dl className="mt-2 grid grid-cols-[auto_auto] justify-end gap-x-4 text-[#5f574e]">
+            <dt>Date</dt>
+            <dd className="text-[#1a1715]">{fmtDate(receipt.paidOn)}</dd>
+            <dt>Against quotation</dt>
+            <dd className="font-mono text-[#1a1715]">{quote.number}</dd>
+            {quote.supplyType !== "export" && quote.placeOfSupply ? (
+              <>
+                <dt>Place of supply</dt>
+                <dd className="text-[#1a1715]">{state(quote.placeOfSupply)}</dd>
+              </>
+            ) : null}
+          </dl>
+        </div>
+      </header>
+
+      <section className="mt-5">
+        <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Received from</div>
+        <div className="mt-1 font-semibold">{client.legalName ?? client.name}</div>
+        {client.billingAddress ? <div className="whitespace-pre-line text-[#5f574e]">{client.billingAddress}</div> : null}
+        {client.gstin ? (
+          <div className="text-[#5f574e]">
+            GSTIN <b className="font-mono text-[#1a1715]">{client.gstin}</b>
+          </div>
+        ) : client.stateCode ? (
+          <div className="text-[#5f574e]">{state(client.stateCode)}</div>
+        ) : null}
+      </section>
+
+      <p className="mt-6 rounded-lg bg-[#f5f1ea] p-4 text-[14px]">
+        Received with thanks <b className="font-mono">{m(receipt.amount)}</b> ({amountInWords(receipt.amount, quote.currency)}) by {PAYMENT_METHOD_LABEL[receipt.method] ?? receipt.method}
+        {receipt.reference ? <> (ref. <span className="font-mono">{receipt.reference}</span>)</> : null}, as {balance > 0 ? "an advance" : "the final payment"} against quotation{" "}
+        <span className="font-mono">{quote.number}</span> dated {fmtDate(quote.issueDate)}.
+      </p>
+
+      <table className="mt-6 w-full border-collapse text-left">
+        <thead>
+          <tr className="border-y border-[#1a1715]/80 text-[11px] uppercase tracking-wider text-[#5f574e]">
+            <th className="py-2 pr-2 font-semibold">#</th>
+            <th className="py-2 pr-2 font-semibold">For</th>
+            <th className="py-2 pr-2 font-semibold">HSN/SAC</th>
+            {quote.supplyType !== "export" ? <th className="py-2 text-right font-semibold">GST</th> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((l, i) => (
+            <tr key={l.id ?? i} className="border-b border-[#e2dace] align-top">
+              <td className="py-2 pr-2 text-[#8a8178]">{i + 1}</td>
+              <td className="py-2 pr-2 whitespace-pre-line">{l.description}</td>
+              <td className="py-2 pr-2 font-mono text-xs">{l.hsnSac ?? ""}</td>
+              {quote.supplyType !== "export" ? <td className="py-2 text-right font-mono">{Number(l.taxRate)}%</td> : null}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <section className="mt-5 flex flex-wrap justify-between gap-6">
+        <dl className="grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-[#5f574e]">
+          <dt>Quotation total</dt>
+          <dd className="text-right font-mono text-[#1a1715]">{m(quote.total)}</dd>
+          <dt>Received earlier</dt>
+          <dd className="text-right font-mono text-[#1a1715]">{m(earlier)}</dd>
+          <dt>This receipt</dt>
+          <dd className="text-right font-mono text-[#1a1715]">{m(receipt.amount)}</dd>
+          <dt className="font-semibold text-[#1a1715]">Balance</dt>
+          <dd className="text-right font-mono font-semibold text-[#1a1715]">{m(Math.max(0, balance))}</dd>
+        </dl>
+
+        <dl className="grid w-full max-w-xs grid-cols-[1fr_auto] gap-x-6 gap-y-1">
+          {tax ? (
+            <>
+              <dt className="text-[#5f574e]">Taxable value</dt>
+              <dd className="text-right font-mono">{m(receipt.amount - tax)}</dd>
+              {receipt.igst ? (
+                <>
+                  <dt className="text-[#5f574e]">IGST{rates.length === 1 ? ` @ ${rates[0]}%` : ""}</dt>
+                  <dd className="text-right font-mono">{m(receipt.igst)}</dd>
+                </>
+              ) : (
+                <>
+                  <dt className="text-[#5f574e]">CGST{half}</dt>
+                  <dd className="text-right font-mono">{m(receipt.cgst)}</dd>
+                  <dt className="text-[#5f574e]">SGST{half}</dt>
+                  <dd className="text-right font-mono">{m(receipt.sgst)}</dd>
+                </>
+              )}
+            </>
+          ) : null}
+          <dt className="mt-1 border-t-2 border-[#1a1715] pt-2 font-display text-base font-bold">Amount received</dt>
+          <dd className="mt-1 border-t-2 border-[#1a1715] pt-2 text-right font-mono text-base font-bold">{m(receipt.amount)}</dd>
+        </dl>
+      </section>
+
+      <footer className="mt-10 flex items-end justify-between gap-6 text-xs text-[#8a8178]">
+        <span>
+          This is a receipt, not a tax invoice. {balance > 0 ? "The tax invoice is issued once the quotation is paid in full." : "The tax invoice for this quotation follows."}
+        </span>
         <span className="text-right">
           For {seller.legalName ?? seller.name}
           <br />

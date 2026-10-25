@@ -14,7 +14,15 @@ const viewers = {
 };
 
 type Doc = { id: string; number: string | null; status: string; total: number; amountPaid: number; cgst: number; sgst: number; igst: number; supplyType: string; subtotal: number };
-type DocDetail = { document: Doc; publicUrl: string | null; payments: { id: string; amount: number; method: string }[] };
+type Receipt = { id: string; number: string; amount: number; cgst: number; sgst: number; igst: number; voidedAt: string | null };
+type DocDetail = {
+  document: Doc;
+  publicUrl: string | null;
+  payments: { id: string; amount: number; method: string; receiptNumber: string | null }[];
+  receipts: Receipt[];
+  related: { id: string; kind: string }[];
+  finalInvoice: { id: string; number: string } | null;
+};
 
 let t: Awaited<ReturnType<typeof createTestApi>>;
 const client: Record<string, string> = {};
@@ -127,13 +135,70 @@ describe("credit notes and quotes", () => {
     expect((await detail(inv)).document).toMatchObject({ status: "sent", amountPaid: 0 });
   });
 
-  it("quotes convert into draft invoices", async () => {
+  it("quotes never turn straight into invoices", async () => {
     const q = await create(client.mumbai!, [line(2000), line(500, 5)], "quote");
     await t.call("ace", `/finance/documents/${q}/issue`, {});
-    const inv = (await t.call<{ document: { id: string } }>("ace", `/finance/documents/${q}/copy`, { as: "invoice" })).json.document.id;
-    const [qd, id] = [await detail(q), await detail(inv)];
-    expect(qd.document.status).toBe("accepted");
-    expect(id.document).toMatchObject({ status: "draft", total: qd.document.total });
+    expect((await t.call("ace", `/finance/documents/${q}/copy`, { as: "invoice" })).status).toBe(400);
+    expect((await t.call("ace", `/finance/documents/${q}/final-invoice`, {})).status).toBe(409);
+  });
+});
+
+describe("quotes, receipts and the final invoice", () => {
+  let q = "";
+  let first = "";
+  let inv = "";
+
+  it("gives a receipt, with the GST it contains, for each payment against a quote", async () => {
+    // ₹1,00,000 + 18% in-state = ₹1,18,000
+    q = await create(client.mumbai!, [line(100_000)], "quote");
+    await t.call("ace", `/finance/documents/${q}/issue`, {});
+    const paid = await t.call<{ payment: { id: string; receiptNumber: string } }>("ace", `/finance/documents/${q}/payments`, { amount: 3_540_000, method: "upi", paidOn: "2026-10-05" });
+    expect(paid.status).toBe(201);
+    expect(paid.json.payment.receiptNumber).toBe("RCPT/26-27/0001");
+    first = paid.json.payment.id;
+    const d = await detail(q);
+    expect(d.document).toMatchObject({ status: "partially_paid", amountPaid: 3_540_000 });
+    expect(d.receipts[0]).toMatchObject({ number: "RCPT/26-27/0001", amount: 3_540_000, cgst: 270_000, sgst: 270_000, igst: 0 });
+    expect((await t.call("ace", `/finance/documents/${q}/payments`, { amount: 9_000_000, method: "upi", paidOn: "2026-10-06" })).status).toBe(422);
+    expect((await t.call("ace", `/finance/documents/${q}/final-invoice`, {})).status).toBe(409);
+    expect((await t.call("ace", `/finance/documents/${q}/quote-status`, { status: "declined" })).status).toBe(409);
+  });
+
+  it("shows receipts to the client on the quote's link", async () => {
+    const token = (await detail(q)).publicUrl!.slice(3);
+    const pub = await t.call<{ receipts: Receipt[]; amountRequested: number; canPayOnline: boolean }>(null, `/public/invoices/${token}`);
+    expect(pub.json).toMatchObject({ amountRequested: 8_260_000, canPayOnline: true });
+    expect(pub.json.receipts.map((r) => r.number)).toEqual(["RCPT/26-27/0001"]);
+    expect((await t.call<{ receipt: { number: string } }>("ace", `/finance/receipts/${first}`)).json.receipt.number).toBe("RCPT/26-27/0001");
+  });
+
+  it("generates the final invoice once the quote is paid in full, settled by its receipts", async () => {
+    const rest = await t.call<{ payment: { receiptNumber: string } }>("ace", `/finance/documents/${q}/payments`, { amount: 8_260_000, method: "bank_transfer", paidOn: "2026-10-20", reference: "UTR9" });
+    expect(rest.json.payment.receiptNumber).toBe("RCPT/26-27/0002");
+    const quote = await detail(q);
+    expect(quote.document.status).toBe("paid");
+    // Together the receipts carry exactly the quote's GST.
+    expect(quote.receipts.reduce((a, r) => a + r.cgst + r.sgst, 0)).toBe(1_800_000);
+
+    const made = await t.call<{ document: { id: string }; number: string }>("ace", `/finance/documents/${q}/final-invoice`, { email: false });
+    expect(made.status).toBe(201);
+    expect(made.json.number).toMatch(/^INV\/26-27\/\d{4}$/);
+    inv = made.json.document.id;
+    const final = await detail(inv);
+    expect(final.document).toMatchObject({ status: "paid", total: 11_800_000, amountPaid: 11_800_000, cgst: 900_000, sgst: 900_000 });
+    expect(final.receipts).toHaveLength(2);
+    expect(final.related).toEqual([expect.objectContaining({ id: q, kind: "quote" })]);
+    expect((await detail(q)).finalInvoice?.id).toBe(inv);
+    expect((await t.call("ace", `/finance/documents/${q}/final-invoice`, {})).status).toBe(409);
+  });
+
+  it("keeps receipts that settle an invoice until the invoice is voided", async () => {
+    expect((await t.call("fia", `/finance/payments/${first}/void`, {})).status).toBe(409);
+    expect((await t.call("fia", `/finance/documents/${inv}/void`, {})).status).toBe(200);
+    expect((await t.call("fia", `/finance/payments/${first}/void`, {})).status).toBe(200);
+    const d = await detail(q);
+    expect(d.document).toMatchObject({ status: "partially_paid", amountPaid: 8_260_000 });
+    expect(d.finalInvoice).toBeNull();
   });
 });
 
@@ -185,6 +250,30 @@ describe("Razorpay", () => {
     const d = await detail(inv);
     expect(d.document.status).toBe("paid");
     expect(d.payments.filter((p) => p.method === "razorpay")).toHaveLength(1);
+  });
+});
+
+describe("Razorpay on quotes", () => {
+  it("asks for an advance, and gives a receipt when it's paid online", async () => {
+    const q = await create(client.mumbai!, [line(10_000)], "quote");
+    await t.call("ace", `/finance/documents/${q}/issue`, {});
+    const fetchMock = vi.fn(async () => Response.json({ id: "plink_ADV", short_url: "https://rzp.io/i/adv" }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect((await t.call("ace", `/finance/documents/${q}/payment-link`, { amount: 99_999_999 })).status).toBe(422);
+    const r = await t.call<{ url: string }>("ace", `/finance/documents/${q}/payment-link`, { amount: 354_000 });
+    vi.unstubAllGlobals();
+    expect(r.json.url).toBe("https://rzp.io/i/adv");
+    expect(JSON.parse(String((fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit])[1].body))).toMatchObject({ amount: 354_000 });
+
+    const body = JSON.stringify({
+      event: "payment_link.paid",
+      payload: { payment_link: { entity: { id: "plink_ADV", notes: { invoice_id: q } } }, payment: { entity: { id: "pay_ADV", amount: 354_000, method: "upi", created_at: 1_790_000_000 } } },
+    });
+    const res = await t.app.request(`/public/razorpay/${orgId}/webhook`, { method: "POST", body, headers: { "x-razorpay-signature": await hmacSha256Hex("whsec", body), "content-type": "application/json" } });
+    expect(res.status).toBe(204);
+    const d = await detail(q);
+    expect(d.document).toMatchObject({ status: "partially_paid", amountPaid: 354_000 });
+    expect(d.receipts).toEqual([expect.objectContaining({ amount: 354_000, number: expect.stringMatching(/^RCPT\//) })]);
   });
 });
 

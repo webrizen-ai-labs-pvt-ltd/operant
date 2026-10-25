@@ -39,3 +39,4 @@
 | D35 | 2026-10-01 | Each org connects its own Razorpay; key and webhook secrets are AES-GCM encrypted (ENCRYPTION_KEY); webhooks are signature-checked and idempotent by payment id | Tenants collect into their own accounts; replays can't double-count |
 | D36 | 2026-10-01 | Retainers and reminders run from a daily job (cloud cron) and lazily on the finance dashboard (offline) | No scheduler required in the offline edition |
 | D37 | 2026-10-01 | Dashboard totals use the org currency only; foreign-currency balances are listed separately | Never add dollars to rupees |
+| D38 | 2026-10-25 | Quotes are paid against: every payment on a quote gets a numbered receipt (a GST receipt voucher carrying the tax in proportion), and the final tax invoice is generated only once the quote is paid in full. Directly issued invoices (retainers, milestones, EMI plans) are unchanged | An invoice is the final bill; advances and part payments need receipts, not invoices |

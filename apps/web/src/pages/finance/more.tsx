@@ -76,7 +76,8 @@ export function PaymentsPage() {
                 <tr className="border-b border-secondary bg-secondary text-left text-xs font-semibold text-quaternary">
                   <th className="px-5 py-3 font-semibold">Date</th>
                   <th className="px-5 py-3 font-semibold">Client</th>
-                  <th className="px-5 py-3 font-semibold">Invoice</th>
+                  <th className="px-5 py-3 font-semibold">Against</th>
+                  <th className="px-5 py-3 font-semibold">Receipt</th>
                   <th className="px-5 py-3 font-semibold">Method</th>
                   <th className="px-5 py-3 text-right font-semibold">Amount</th>
                 </tr>
@@ -95,6 +96,16 @@ export function PaymentsPage() {
                       <Link to="/finance/invoices/$id" params={{ id: p.invoiceId }} className="font-mono text-xs text-brand-secondary hover:underline">
                         {p.invoiceNumber}
                       </Link>
+                      {p.invoiceKind === "quote" ? <span className="ml-1.5 text-xs text-tertiary">quote</span> : null}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      {p.receiptNumber ? (
+                        <Link to="/finance/receipts/$id" params={{ id: p.id }} className="font-mono text-xs text-brand-secondary hover:underline">
+                          {p.receiptNumber}
+                        </Link>
+                      ) : (
+                        <span className="text-quaternary">—</span>
+                      )}
                     </td>
                     <td className="px-5 py-3.5 text-tertiary">
                       {PAYMENT_METHOD_LABEL[p.method] ?? p.method}
@@ -362,6 +373,7 @@ export function FinanceSettingsPage({ me }: { me: Me }) {
       invoicePrefix: s.invoicePrefix,
       quotePrefix: s.quotePrefix,
       creditNotePrefix: s.creditNotePrefix,
+      receiptPrefix: s.receiptPrefix,
       defaultDueDays: String(s.defaultDueDays),
       terms: s.terms ?? "",
       notes: s.notes ?? "",
@@ -390,6 +402,7 @@ export function FinanceSettingsPage({ me }: { me: Me }) {
           invoicePrefix: str("invoicePrefix"),
           quotePrefix: str("quotePrefix"),
           creditNotePrefix: str("creditNotePrefix"),
+          receiptPrefix: str("receiptPrefix"),
           defaultDueDays: Number(str("defaultDueDays")) || 0,
           terms: str("terms") || null,
           notes: str("notes") || null,
@@ -470,17 +483,20 @@ export function FinanceSettingsPage({ me }: { me: Me }) {
           <Field label="Quote prefix">
             <Input value={str("quotePrefix")} onChange={(e) => set("quotePrefix", e.target.value.toUpperCase().slice(0, 6))} disabled={!canManage} className="font-mono" />
           </Field>
+          <Field label="Receipt prefix" hint="For payments against quotes">
+            <Input value={str("receiptPrefix")} onChange={(e) => set("receiptPrefix", e.target.value.toUpperCase().slice(0, 6))} disabled={!canManage} className="font-mono" />
+          </Field>
           <Field label="Credit note prefix">
             <Input value={str("creditNotePrefix")} onChange={(e) => set("creditNotePrefix", e.target.value.toUpperCase().slice(0, 6))} disabled={!canManage} className="font-mono" />
-          </Field>
-          <Field label="Pay within (days)">
-            <Input type="number" min={0} max={365} value={str("defaultDueDays")} onChange={(e) => set("defaultDueDays", e.target.value)} disabled={!canManage} />
           </Field>
           <Field label="Default notes" className="sm:col-span-2">
             <Textarea value={str("notes")} onChange={(e) => set("notes", e.target.value)} disabled={!canManage} placeholder="Thank you for your business!" />
           </Field>
           <Field label="Default terms" className="sm:col-span-2">
             <Textarea value={str("terms")} onChange={(e) => set("terms", e.target.value)} disabled={!canManage} placeholder="Payment due within 15 days. Interest at 18% p.a. on late payments." />
+          </Field>
+          <Field label="Pay within (days)">
+            <Input type="number" min={0} max={365} value={str("defaultDueDays")} onChange={(e) => set("defaultDueDays", e.target.value)} disabled={!canManage} />
           </Field>
           <Toggle
             className="sm:col-span-4"

@@ -165,6 +165,26 @@ export function documentNumber(prefix: string, date: string, seq: number): strin
   return n.length <= 16 ? n : `${prefix.slice(0, Math.max(1, 16 - n.length + prefix.length))}/${financialYear(date)}/${String(seq).padStart(4, "0")}`;
 }
 
+/**
+ * The GST contained in a payment received against a quote, for its receipt voucher
+ * (CGST Rules, rule 50): the quote's tax in proportion to the amount. It's worked out on the
+ * running total received, so once the quote is fully paid its receipts add up exactly to the
+ * quote's tax, which the final invoice then carries.
+ */
+export function receiptTax(quote: { total: number; cgst: number; sgst: number; igst: number }, paidBefore: number, amount: number) {
+  const upTo = (paid: number) => {
+    if (quote.total <= 0 || paid >= quote.total) return { cgst: quote.cgst, sgst: quote.sgst, igst: quote.igst };
+    const share = (tax: number) => Math.round((tax * paid) / quote.total);
+    return { cgst: share(quote.cgst), sgst: share(quote.sgst), igst: share(quote.igst) };
+  };
+  const before = upTo(paidBefore);
+  const after = upTo(paidBefore + amount);
+  const cgst = after.cgst - before.cgst;
+  const sgst = after.sgst - before.sgst;
+  const igst = after.igst - before.igst;
+  return { taxable: amount - cgst - sgst - igst, cgst, sgst, igst };
+}
+
 /** ₹1,23,456.78 style (Indian digit grouping). */
 export function formatMoney(paise: number, currency = "INR"): string {
   return new Intl.NumberFormat(currency === "INR" ? "en-IN" : "en-US", { style: "currency", currency, minimumFractionDigits: 2 }).format(paise / 100);

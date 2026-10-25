@@ -121,8 +121,8 @@ export function BillingPage() {
                             Paid
                           </Badge>
                         ) : d.kind === "quote" ? (
-                          <Badge tone={d.status === "accepted" ? "people" : d.status === "declined" ? "danger" : "brand"} pill>
-                            {d.status === "sent" ? "Waiting for you" : d.status[0]!.toUpperCase() + d.status.slice(1)}
+                          <Badge tone={d.status === "accepted" || d.status === "partially_paid" ? "people" : d.status === "declined" ? "danger" : "brand"} pill>
+                            {{ sent: "Waiting for you", accepted: "Accepted", partially_paid: "Part paid", declined: "Declined", void: "Cancelled" }[d.status] ?? d.status}
                           </Badge>
                         ) : null}
                       </div>
@@ -131,7 +131,7 @@ export function BillingPage() {
                         {unpaid && d.dueDate ? ` · due ${longDate(d.dueDate)}` : ""}
                       </div>
                     </div>
-                    <span className="font-mono text-sm">{money(unpaid ? balance : d.total, d.currency)}</span>
+                    <span className="font-mono text-sm">{money(unpaid || d.status === "partially_paid" ? balance : d.total, d.currency)}</span>
                     <Button size="sm" variant={unpaid ? "primary" : "secondary"} asChild>
                       <a href={d.url} target="_blank" rel="noreferrer">
                         {unpaid ? "View and pay" : "View"} <ExternalLink />

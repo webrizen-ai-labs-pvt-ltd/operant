@@ -57,6 +57,13 @@
       "when": 1791048872030,
       "tag": "0007_client_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792909625706,
+      "tag": "0008_quote_receipts",
+      "breakpoints": true
     }
   ]
 }

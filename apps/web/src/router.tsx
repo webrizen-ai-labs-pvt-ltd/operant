@@ -10,6 +10,7 @@ import { DocumentPage, DocumentsPage, NewDocumentPage } from "./pages/finance/do
 import { FinanceLayout } from "./pages/finance/layout.tsx";
 import { FinanceSettingsPage, PaymentsPage, RetainersPage } from "./pages/finance/more.tsx";
 import { FinanceOverviewPage } from "./pages/finance/overview.tsx";
+import { ReceiptPage } from "./pages/finance/receipt.tsx";
 import { HomePage } from "./pages/home.tsx";
 import { DirectoryPage } from "./pages/people/directory.tsx";
 import { PeopleLayout } from "./pages/people/layout.tsx";
@@ -169,6 +170,7 @@ const routeTree = rootRoute.addChildren([
       ...(typeof s.projectId === "string" ? { projectId: s.projectId } : {}),
     })),
     financePage("invoices/$id", () => <DocumentPage me={useViewer()} />),
+    financePage("receipts/$id", () => <ReceiptPage />),
     financePage("clients", () => <ClientsPage me={useViewer()} />),
     financePage("clients/$id", () => <ClientPage me={useViewer()} />),
     financePage("payments", () => <PaymentsPage />),

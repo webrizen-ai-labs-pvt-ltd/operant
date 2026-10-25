@@ -1,13 +1,14 @@
 import { todayIn } from "@operant/core";
 import { clients, installments, invoiceLines, invoices, notifications, orgSettings, orgs, payments } from "@operant/db";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { formatMoney } from "@operant/core";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AppEnv } from "../context.ts";
 import { hmacSha256Hex, safeEqual, sha256Hex } from "../secrets.ts";
 import { activePlan, installmentPaymentLink, payInstallment, planView } from "./installments.ts";
-import { createPaymentLink, loadSettings, refreshPaid } from "./service.ts";
+import { createPaymentLink, emailReceipt, loadSettings, OPEN_QUOTE, receiptsFor, recordPayment } from "./service.ts";
 
 async function orgToday(db: AppEnv["Variables"]["deps"]["db"], orgId: string) {
   const [s] = await db.select({ tz: orgSettings.timezone }).from(orgSettings).where(eq(orgSettings.orgId, orgId));
@@ -37,6 +38,10 @@ export const financePublicRoutes = new Hono<AppEnv>()
     const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, inv.id)).orderBy(asc(invoiceLines.position));
     const schedule = inv.kind === "invoice" ? await planView(db, inv.id) : null;
     const online = Boolean(settings.razorpayKeyId && settings.razorpayKeySecretEnc);
+    // A quote's receipts; a final invoice lists the receipts that settled it.
+    const [source] = inv.kind === "invoice" && inv.relatedId ? await db.select({ id: invoices.id }).from(invoices).where(and(eq(invoices.id, inv.relatedId), eq(invoices.kind, "quote"))) : [];
+    const quoteId = inv.kind === "quote" ? inv.id : (source?.id ?? null);
+    const openQuote = inv.kind === "quote" && (OPEN_QUOTE as readonly string[]).includes(inv.status);
     c.header("cache-control", "no-store");
     c.header("x-robots-tag", "noindex");
     return c.json({
@@ -61,6 +66,9 @@ export const financePublicRoutes = new Hono<AppEnv>()
         notes: inv.notes,
         terms: inv.terms,
       },
+      receipts: quoteId ? (await receiptsFor(db, quoteId)).filter((r) => !r.voidedAt).map(({ voidedAt: _, ...r }) => r) : [],
+      /** On a quote: what the team has asked the client to pay now (an advance), else the balance. */
+      amountRequested: openQuote ? (inv.paymentLinkAmount ?? inv.total - inv.amountPaid) : null,
       lines: lines.map(({ orgId: _, invoiceId: __, itemId: ___, ...l }) => l),
       client: {
         name: client!.name,
@@ -90,7 +98,9 @@ export const financePublicRoutes = new Hono<AppEnv>()
           }
         : null,
       // With a plan, the client pays instalment by instalment (only those already billed).
-      canPayOnline: online && inv.kind === "invoice" && ["sent", "partially_paid"].includes(inv.status) && (schedule?.plan.status === "active" ? schedule.installments.some((r) => r.status === "billed") : true),
+      canPayOnline:
+        online &&
+        (openQuote || (inv.kind === "invoice" && ["sent", "partially_paid"].includes(inv.status) && (schedule?.plan.status === "active" ? schedule.installments.some((r) => r.status === "billed") : true))),
     });
   })
 
@@ -138,6 +148,7 @@ export const financePublicRoutes = new Hono<AppEnv>()
     const link = event.payload?.payment_link?.entity;
     const pay = event.payload?.payment?.entity;
     if (!link?.id || !pay?.id || !pay.amount) return c.body(null, 204);
+    const deps = c.get("deps");
     const paidOnDate = new Date((pay.created_at ?? Date.now() / 1000) * 1000).toISOString().slice(0, 10);
 
     // An instalment's link: split between its interest invoice and the original invoice.
@@ -152,40 +163,32 @@ export const financePublicRoutes = new Hono<AppEnv>()
       ).catch((e) => console.error("Instalment payment from Razorpay failed", e));
       return c.body(null, 204);
     }
+    // The current link, or an older one for the same document (its notes name the document).
+    const noted = link.notes?.invoice_id && z.uuid().safeParse(link.notes.invoice_id).success ? link.notes.invoice_id : null;
     const [inv] = await db
       .select()
       .from(invoices)
-      .where(and(eq(invoices.orgId, orgId), eq(invoices.paymentLinkId, link.id)));
+      .where(and(eq(invoices.orgId, orgId), noted ? or(eq(invoices.paymentLinkId, link.id), eq(invoices.id, noted)) : eq(invoices.paymentLinkId, link.id)));
     if (!inv) return c.body(null, 204);
 
-    const paidOn = new Date((pay.created_at ?? Date.now() / 1000) * 1000).toISOString().slice(0, 10);
-    const inserted = await db
-      .insert(payments)
-      .values({
-        orgId,
-        invoiceId: inv.id,
-        clientId: inv.clientId,
-        amount: pay.amount,
-        method: "razorpay",
-        paidOn,
-        reference: pay.id,
-        notes: pay.method ? `Paid online by ${pay.method}` : "Paid online",
-        gatewayPaymentId: pay.id,
-        createdBy: "razorpay",
-      })
-      .onConflictDoNothing()
-      .returning({ id: payments.id });
-    if (inserted.length) {
-      // A link is for one balance; the next reminder or "Pay now" makes a fresh one.
-      await db.update(invoices).set({ paymentLinkId: null, paymentLinkUrl: null }).where(eq(invoices.id, inv.id));
-      await refreshPaid(db, inv.id);
+    const payment = await recordPayment(db, inv, {
+      amount: pay.amount,
+      method: "razorpay",
+      paidOn: paidOnDate,
+      reference: pay.id,
+      notes: pay.method ? `Paid online by ${pay.method}` : "Paid online",
+      gatewayPaymentId: pay.id,
+      createdBy: "razorpay",
+    });
+    if (payment) {
+      if (payment.receiptNumber) await emailReceipt(deps, inv, payment);
       if (inv.createdBy && inv.createdBy !== "system") {
         await db.insert(notifications).values({
           orgId,
           recipientId: inv.createdBy,
           type: "payment.received",
           title: `Payment received for ${inv.number}`,
-          body: `₹${(pay.amount / 100).toLocaleString("en-IN")} paid online`,
+          body: `${formatMoney(pay.amount, inv.currency)} paid online${payment.receiptNumber ? `, receipt ${payment.receiptNumber}` : ""}`,
           link: `/finance/invoices/${inv.id}`,
         });
       }

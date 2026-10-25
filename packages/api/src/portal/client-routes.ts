@@ -445,6 +445,14 @@ export const portalClientRoutes = new Hono<AppEnv>()
       if (p.unread) attention.push({ kind: "message", title: `New message on ${p.name}`, path: `/projects/${p.id}` });
     }
     if (due[0]?.n) attention.push({ kind: "invoice", title: `${due[0].n} invoice${due[0].n === 1 ? "" : "s"} to pay`, detail: String(due[0].amount), path: "/billing" });
+    // Payments the team has asked for against quotes (advances): each gets a receipt.
+    const requested = u.clientId
+      ? await db
+          .select({ number: invoices.number, amount: invoices.paymentLinkAmount })
+          .from(invoices)
+          .where(and(eq(invoices.orgId, org.id), eq(invoices.clientId, u.clientId), eq(invoices.kind, "quote"), inArray(invoices.status, ["sent", "accepted", "partially_paid"]), sql`${invoices.paymentLinkAmount} is not null`))
+      : [];
+    for (const q of requested) attention.push({ kind: "invoice", title: `Payment requested for quote ${q.number}`, detail: String(q.amount), path: "/billing" });
 
     return c.json({
       attention,

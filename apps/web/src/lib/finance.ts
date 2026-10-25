@@ -53,6 +53,8 @@ export interface Doc extends Omit<DocRow, "clientName"> {
   notes: string | null;
   terms: string | null;
   paymentLinkUrl: string | null;
+  /** What the current payment link asks for (an advance on a quote can be less than the balance). */
+  paymentLinkAmount: number | null;
   paidAt: string | null;
   voidedAt: string | null;
   lastReminderAt: string | null;
@@ -101,6 +103,22 @@ export interface Payment {
   reference: string | null;
   notes: string | null;
   voidedAt: string | null;
+  /** Set on payments against a quote. */
+  receiptNumber: string | null;
+}
+
+/** A receipt for a payment against a quote, with the GST the amount contains. */
+export interface Receipt {
+  id: string;
+  number: string;
+  paidOn: string;
+  amount: number;
+  method: string;
+  reference: string | null;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  voidedAt?: string | null;
 }
 
 export interface DocDetail {
@@ -108,6 +126,10 @@ export interface DocDetail {
   lines: Line[];
   payments: Payment[];
   related: { id: string; kind: DocKind; number: string | null; status: DocStatus; total: number }[];
+  /** A quote's receipts, or the receipts that settled a final invoice. */
+  receipts: Receipt[];
+  /** On a quote: the final invoice generated from it. */
+  finalInvoice: { id: string; number: string | null } | null;
   client: ClientInfo & { id: string };
   project: { id: string; name: string } | null;
   seller: Seller & { razorpayConnected: boolean };
@@ -142,6 +164,7 @@ export interface FinanceSettings extends Omit<Seller, "name"> {
   invoicePrefix: string;
   quotePrefix: string;
   creditNotePrefix: string;
+  receiptPrefix: string;
   defaultDueDays: number;
   terms: string | null;
   notes: string | null;
@@ -193,7 +216,7 @@ export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   other: "Other",
 };
 
-export const FINANCE_KEYS = ["finance-docs", "finance-doc", "finance-summary", "clients", "client", "finance-payments", "finance-recurring", "finance-settings", "finance-items", "finance-tax-rates", "project"];
+export const FINANCE_KEYS = ["finance-docs", "finance-doc", "finance-receipt", "finance-summary", "clients", "client", "finance-payments", "finance-recurring", "finance-settings", "finance-items", "finance-tax-rates", "project"];
 
 export const money = (paise: number, currency = "INR") => formatMoney(paise, currency);
 
@@ -238,6 +261,15 @@ export const useDocs = (params: { kind?: DocKind; status?: string; clientId?: st
   useQuery({ queryKey: ["finance-docs", params], queryFn: () => api<{ today: string; documents: DocRow[] }>(`finance/documents${qs(params)}`) });
 export const useDoc = (id: string | undefined) =>
   useQuery({ queryKey: ["finance-doc", id], queryFn: () => api<DocDetail>(`finance/documents/${id}`), enabled: Boolean(id) });
+export interface ReceiptDetail {
+  receipt: Receipt;
+  quote: Doc;
+  receipts: Receipt[];
+  lines: Line[];
+  client: ClientInfo;
+  seller: Seller;
+}
+export const useReceipt = (id: string) => useQuery({ queryKey: ["finance-receipt", id], queryFn: () => api<ReceiptDetail>(`finance/receipts/${id}`) });
 export const useClients = (q?: string) => useQuery({ queryKey: ["clients", q ?? ""], queryFn: () => api<{ clients: ClientRow[] }>(`clients${qs({ q })}`) });
 export const useClient = (id: string) =>
   useQuery({ queryKey: ["client", id], queryFn: () => api<{ client: ClientInfo & { id: string; email: string | null; phone: string | null }; contacts: { id: string; name: string; email: string | null; phone: string | null; designation: string | null; isPrimary: boolean }[] }>(`clients/${id}`) });
@@ -249,7 +281,7 @@ export const usePayments = () =>
   useQuery({
     queryKey: ["finance-payments"],
     queryFn: () =>
-      api<{ payments: (Payment & { invoiceId: string; invoiceNumber: string | null; clientName: string; currency: string })[] }>("finance/payments"),
+      api<{ payments: (Payment & { invoiceId: string; invoiceNumber: string | null; invoiceKind: DocKind; clientName: string; currency: string })[] }>("finance/payments"),
   });
 export const useRecurring = () =>
   useQuery({

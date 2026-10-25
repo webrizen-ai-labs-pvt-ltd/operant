@@ -314,7 +314,17 @@ export function ServiceRequestPage({ me }: { me: Me }) {
                 <span className="font-mono">{money(data.quote.total, data.quote.currency)}</span>
               </Link>
               <p className="mt-1 text-xs text-tertiary">
-                {data.quote.status === "draft" ? "Issue it to send it to the client's portal." : data.quote.status === "sent" ? "Waiting for the client." : `The client ${data.quote.status} it.`}
+                {
+                  {
+                    draft: "Issue it to send it to the client's portal.",
+                    sent: "Waiting for the client.",
+                    accepted: "The client accepted it. Record their advance against it.",
+                    partially_paid: "Part paid. Each payment gets a receipt.",
+                    paid: "Paid in full. Generate the final invoice from the quote.",
+                    declined: "The client declined it.",
+                    void: "Void.",
+                  }[data.quote.status] ?? ""
+                }
               </p>
             </Card>
           ) : null}

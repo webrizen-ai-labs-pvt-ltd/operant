@@ -8,6 +8,7 @@ import {
   financialYear,
   formatMoney,
   isValidGstin,
+  receiptTax,
   supplyTypeFor,
 } from "./finance.ts";
 
@@ -109,5 +110,31 @@ describe("EMI schedule", () => {
     expect(s.rows.map((r) => r.principal)).toEqual([333_334, 333_334, 333_333]);
     expect(s.rows.map((r) => r.interest)).toEqual([0, 0, 0]);
     expect(s.rows.map((r) => r.dueDate)).toEqual(["2026-05-15", "2026-08-15", "2026-11-15"]);
+  });
+});
+
+describe("receipt tax", () => {
+  // ₹1,00,000 + 18% GST in-state = ₹1,18,000
+  const quote = { total: 11_800_000, cgst: 900_000, sgst: 900_000, igst: 0 };
+
+  it("carries the quote's GST in proportion to the amount received", () => {
+    expect(receiptTax(quote, 0, 3_540_000)).toEqual({ taxable: 3_000_000, cgst: 270_000, sgst: 270_000, igst: 0 });
+  });
+
+  it("adds up exactly to the quote's tax once fully paid", () => {
+    const parts = [333_333, 1_000_001, 4_466_666, 6_000_000];
+    let paid = 0;
+    const sum = { taxable: 0, cgst: 0, sgst: 0, igst: 0 };
+    for (const amount of parts) {
+      const r = receiptTax(quote, paid, amount);
+      paid += amount;
+      for (const k of Object.keys(sum) as (keyof typeof sum)[]) sum[k] += r[k];
+    }
+    expect(paid).toBe(quote.total);
+    expect(sum).toEqual({ taxable: 10_000_000, cgst: 900_000, sgst: 900_000, igst: 0 });
+  });
+
+  it("has no tax when the quote has none", () => {
+    expect(receiptTax({ total: 500_000, cgst: 0, sgst: 0, igst: 0 }, 0, 100_000)).toEqual({ taxable: 100_000, cgst: 0, sgst: 0, igst: 0 });
   });
 });

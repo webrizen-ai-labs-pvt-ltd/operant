@@ -6,6 +6,10 @@ import { orgs } from "./foundation.ts";
 /*
  * Amounts are integer paise (bigint, read as JS numbers: safe up to ~₹90 lakh crore).
  * Quotes, invoices and credit notes share one table and line format.
+ *
+ * A quote is what the client pays against: every payment on it gets a numbered receipt
+ * (a GST receipt voucher), and once it's fully paid the final tax invoice is generated
+ * from it. Invoices issued directly (retainers, milestones, ad hoc) are paid as before.
  */
 
 const id = () => uuid("id").primaryKey().$defaultFn(uuidv7);
@@ -44,6 +48,8 @@ export const financeSettings = pgTable("finance_settings", {
   invoicePrefix: text("invoice_prefix").notNull().default("INV"),
   quotePrefix: text("quote_prefix").notNull().default("QT"),
   creditNotePrefix: text("credit_note_prefix").notNull().default("CN"),
+  /** Receipts for payments received against a quote (advances and part payments). */
+  receiptPrefix: text("receipt_prefix").notNull().default("RCPT"),
   defaultDueDays: integer("default_due_days").notNull().default(15),
   terms: text("terms"),
   notes: text("notes"),
@@ -168,6 +174,8 @@ export const invoices = pgTable(
     publicTokenHash: text("public_token_hash"),
     paymentLinkId: text("payment_link_id"),
     paymentLinkUrl: text("payment_link_url"),
+    /** What the current payment link asks for (an advance on a quote can be less than the balance). */
+    paymentLinkAmount: bigint("payment_link_amount", { mode: "number" }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     voidedAt: timestamp("voided_at", { withTimezone: true }),
@@ -232,6 +240,14 @@ export const payments = pgTable(
     gatewayPaymentId: text("gateway_payment_id"),
     /** Set when the payment was for an instalment of a plan (see installments). */
     installmentId: uuid("installment_id"),
+    /**
+     * Payments against a quote get a receipt: numbered per financial year, with the GST
+     * contained in the amount (the quote's tax, in proportion). Null for invoice payments.
+     */
+    receiptNumber: text("receipt_number"),
+    receiptCgst: bigint("receipt_cgst", { mode: "number" }),
+    receiptSgst: bigint("receipt_sgst", { mode: "number" }),
+    receiptIgst: bigint("receipt_igst", { mode: "number" }),
     voidedAt: timestamp("voided_at", { withTimezone: true }),
     createdBy: text("created_by"),
     createdAt: createdAt(),
@@ -241,6 +257,7 @@ export const payments = pgTable(
     index("payments_org_paid_idx").on(t.orgId, t.paidOn),
     index("payments_installment_idx").on(t.installmentId),
     uniqueIndex("payments_gateway_key").on(t.orgId, t.gatewayPaymentId).where(sql`${t.gatewayPaymentId} is not null`),
+    uniqueIndex("payments_receipt_key").on(t.orgId, t.receiptNumber).where(sql`${t.receiptNumber} is not null`),
   ],
 ).enableRLS();
 

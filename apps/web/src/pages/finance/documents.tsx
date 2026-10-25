@@ -1,7 +1,7 @@
 import { can, supplyTypeFor } from "@operant/core";
-import { Avatar, Button, Card, cn, DateInput, Dialog, DialogContent, EmptyState, Field, Input, Segmented, Select, Skeleton, Textarea } from "@operant/ui";
+import { Avatar, Button, Card, cn, DateInput, Dialog, DialogContent, EmptyState, Field, Input, Segmented, Select, Skeleton, Textarea, Toggle } from "@operant/ui";
 import { Link, useNavigate, useParams, useSearch } from "@tanstack/react-router";
-import { ArrowLeft, Ban, Banknote, BellRing, Copy, ExternalLink, FilePlus2, FileText, Link2, Printer, ReceiptIndianRupee, Search, Send, Split, Trash2 } from "lucide-react";
+import { ArrowLeft, Ban, Banknote, BellRing, Copy, ExternalLink, FileCheck2, FilePlus2, FileText, HandCoins, Link2, Printer, ReceiptIndianRupee, Search, Send, Split, Trash2 } from "lucide-react";
 import { useDeferredValue, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "../../components/app-shell.tsx";
@@ -55,6 +55,8 @@ const FILTERS = {
     ["draft", "Drafts"],
     ["sent", "Sent"],
     ["accepted", "Accepted"],
+    ["partially_paid", "Part paid"],
+    ["paid", "Paid"],
     ["declined", "Declined"],
   ],
   credit_note: [["", "All"]],
@@ -69,8 +71,9 @@ const INVOICE_BUCKETS = [
 const QUOTE_BUCKETS = [
   { key: "draft", label: "Drafts", color: "var(--color-text-quaternary)", match: (s: string) => s === "draft" },
   { key: "sent", label: "Sent", color: "var(--collab)", match: (s: string) => s === "sent" },
-  { key: "accepted", label: "Accepted", color: "var(--color-fg-success-primary)", match: (s: string) => s === "accepted" },
-  { key: "declined", label: "Declined", color: "var(--color-fg-error-primary)", match: (s: string) => s === "declined" },
+  { key: "accepted", label: "Accepted", color: "var(--people)", match: (s: string) => s === "accepted" },
+  { key: "partially_paid", label: "Part paid", color: "var(--finance)", match: (s: string) => s === "partially_paid" },
+  { key: "paid", label: "Paid in full", color: "var(--color-fg-success-primary)", match: (s: string) => s === "paid" },
 ];
 
 export function DocumentsPage({ me, kind }: { me: Me; kind: "invoice" | "quote" }) {
@@ -90,7 +93,7 @@ export function DocumentsPage({ me, kind }: { me: Me; kind: "invoice" | "quote" 
   const { data: everything } = useDocs({ kind });
   const buckets = (kind === "invoice" ? INVOICE_BUCKETS : QUOTE_BUCKETS).map((b) => {
     const list = (everything?.documents ?? []).filter((d) => b.match(displayStatus(d, everything?.today ?? today)));
-    const amount = list.filter((d) => d.currency === "INR").reduce((a, d) => a + (b.key === "open" || b.key === "overdue" ? d.total - d.amountPaid : d.total), 0);
+    const amount = list.filter((d) => d.currency === "INR").reduce((a, d) => a + (b.key === "open" || b.key === "overdue" ? d.total - d.amountPaid : b.key === "partially_paid" ? d.amountPaid : d.total), 0);
     return { ...b, count: list.length, amount };
   });
 
@@ -98,7 +101,7 @@ export function DocumentsPage({ me, kind }: { me: Me; kind: "invoice" | "quote" 
     <FinanceBody>
       <PageHeader
         title={KIND_LABEL[kind].many}
-        description={kind === "invoice" ? "GST invoices, payments and credit notes." : "Estimates you send before the work starts."}
+        description={kind === "invoice" ? "GST invoices, payments and credit notes." : "Quotes collect advances and part payments, each with a receipt. The final invoice is generated once a quote is paid in full."}
         children={
           everything?.documents.length ? (
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -377,22 +380,39 @@ export function NewDocumentPage({ me }: { me: Me }) {
 /* ---------------- Issued documents ---------------- */
 
 function RecordPaymentDialog({ open, onOpenChange, detail }: { open: boolean; onOpenChange: (o: boolean) => void; detail: DocDetail }) {
+  const isQuote = detail.document.kind === "quote";
   const balance = detail.document.total - detail.document.amountPaid;
   const [amount, setAmount] = useState(toRupees(balance));
   const [method, setMethod] = useState("bank_transfer");
   const [paidOn, setPaidOn] = useState(todayLocal());
   const [reference, setReference] = useState("");
+  const [email, setEmail] = useState(Boolean(detail.client.email));
   const record = useApiMutation(
-    () => api(`finance/documents/${detail.document.id}/payments`, { method: "POST", body: JSON.stringify({ amount: toPaise(amount), method, paidOn, reference: reference || null }) }),
-    { invalidate: FINANCE_KEYS, success: "Payment recorded", onSuccess: () => onOpenChange(false) },
+    () =>
+      api<{ payment: { receiptNumber: string | null }; emailError: string | null }>(`finance/documents/${detail.document.id}/payments`, {
+        method: "POST",
+        body: JSON.stringify({ amount: toPaise(amount), method, paidOn, reference: reference || null, email: isQuote && email }),
+      }),
+    {
+      invalidate: FINANCE_KEYS,
+      onSuccess: (r) => {
+        if (r.payment.receiptNumber) toast.success(`Receipt ${r.payment.receiptNumber} issued`, r.emailError ? { description: `Not emailed: ${r.emailError}` } : undefined);
+        else toast.success("Payment recorded");
+        onOpenChange(false);
+      },
+    },
   );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        title="Record a payment"
+        title={isQuote ? "Record a payment against the quote" : "Record a payment"}
         icon={Banknote}
         iconColor="success"
-        description={`Balance due ${money(balance, detail.document.currency)}`}
+        description={
+          isQuote
+            ? `Balance on the quote ${money(balance, detail.document.currency)}. The client gets a receipt for this payment; the final invoice comes once the quote is paid in full.`
+            : `Balance due ${money(balance, detail.document.currency)}`
+        }
         footer={
           <>
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -423,6 +443,78 @@ function RecordPaymentDialog({ open, onOpenChange, detail }: { open: boolean; on
           <Field label="Reference" hint="UTR, cheque number, …">
             <Input value={reference} onChange={(e) => setReference(e.target.value)} maxLength={120} />
           </Field>
+          {isQuote ? (
+            <Toggle
+              className="sm:col-span-2"
+              isSelected={email}
+              onChange={setEmail}
+              isDisabled={!detail.client.email}
+              label="Email the receipt to the client"
+              hint={detail.client.email ? detail.client.email : "The client has no email address."}
+            />
+          ) : null}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Ask the client to pay online against a quote: an advance, or the whole balance. */
+function RequestPaymentDialog({ open, onOpenChange, detail }: { open: boolean; onOpenChange: (o: boolean) => void; detail: DocDetail }) {
+  const d = detail.document;
+  const balance = d.total - d.amountPaid;
+  const [amount, setAmount] = useState(toRupees(d.amountPaid ? balance : Math.min(balance, Math.round(d.total * 0.3))));
+  const [email, setEmail] = useState(Boolean(detail.client.email));
+  const request = useApiMutation(
+    () => api<{ url: string; emailError: string | null }>(`finance/documents/${d.id}/payment-link`, { method: "POST", body: JSON.stringify({ amount: toPaise(amount), email }) }),
+    {
+      invalidate: FINANCE_KEYS,
+      onSuccess: (r) => {
+        void navigator.clipboard?.writeText(r.url);
+        toast.success(email && !r.emailError ? "Payment requested, and the link is copied" : "Payment link copied", r.emailError ? { description: `Not emailed: ${r.emailError}` } : undefined);
+        onOpenChange(false);
+      },
+    },
+  );
+  const paise = toPaise(amount);
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        title="Request a payment"
+        icon={HandCoins}
+        description={`The client pays this online from the quote, and gets a receipt for it. Balance on the quote ${money(balance, d.currency)}.`}
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={request.isPending || paise <= 0 || paise > balance} onClick={() => request.mutate(undefined)}>
+              <Link2 /> Create payment link
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-4">
+          <Field label="Amount (₹)" hint={paise > balance ? "That's more than the balance" : `${Math.round((paise / d.total) * 100)}% of the quote`}>
+            <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} className="font-mono" autoFocus />
+          </Field>
+          <div className="flex flex-wrap gap-2">
+            {[25, 30, 50].map((pct) => (
+              <Button key={pct} size="sm" variant="secondary" onClick={() => setAmount(toRupees(Math.min(balance, Math.round((d.total * pct) / 100))))}>
+                {pct}%
+              </Button>
+            ))}
+            <Button size="sm" variant="secondary" onClick={() => setAmount(toRupees(balance))}>
+              Full balance
+            </Button>
+          </div>
+          <Toggle
+            isSelected={email}
+            onChange={setEmail}
+            isDisabled={!detail.client.email}
+            label="Email the client a payment request"
+            hint={detail.client.email ? detail.client.email : "The client has no email address."}
+          />
         </div>
       </DialogContent>
     </Dialog>
@@ -432,6 +524,7 @@ function RecordPaymentDialog({ open, onOpenChange, detail }: { open: boolean; on
 function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
   const navigate = useNavigate();
   const [paying, setPaying] = useState(false);
+  const [requesting, setRequesting] = useState(false);
   const [splitting, setSplitting] = useState(false);
   const d = detail.document;
   const today = todayLocal();
@@ -445,12 +538,17 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
   const unpaid = d.kind === "invoice" && (d.status === "sent" || d.status === "partially_paid") && !onPlan && !detail.interestFor;
   // A plan and its interest invoices can't be credited or voided until the plan is cancelled.
   const locked = onPlan || Boolean(detail.interestFor);
+  // Quotes take advances and part payments (each with a receipt) until they're paid in full.
+  const quoteOpen = d.kind === "quote" && ["sent", "accepted", "partially_paid"].includes(d.status);
+  // A final invoice is settled by the receipts on its quote rather than payments of its own.
+  const settledByReceipts = d.kind === "invoice" && detail.payments.length === 0 && detail.receipts.length > 0;
+  const paymentRows = settledByReceipts ? detail.receipts.map((r) => ({ ...r, receiptNumber: r.number, notes: null, voidedAt: r.voidedAt ?? null })) : detail.payments;
   const canSplit = d.kind === "invoice" && (d.status === "sent" || d.status === "partially_paid") && !detail.installments && !detail.interestFor && can(p, "invoice", "update");
   const go = (id: string) => navigate({ to: "/finance/invoices/$id", params: { id } });
 
   const remind = useApiMutation(() => api(`finance/documents/${d.id}/remind`, { method: "POST" }), { invalidate: FINANCE_KEYS, success: "Reminder sent" });
   const voidDoc = useApiMutation(() => api(`finance/documents/${d.id}/void`, { method: "POST" }), { invalidate: FINANCE_KEYS, success: "Marked as void" });
-  const copy = useApiMutation((as: "duplicate" | "invoice" | "credit_note") => api<{ document: { id: string } }>(`finance/documents/${d.id}/copy`, { method: "POST", body: JSON.stringify({ as }) }), {
+  const copy = useApiMutation((as: "duplicate" | "credit_note") => api<{ document: { id: string } }>(`finance/documents/${d.id}/copy`, { method: "POST", body: JSON.stringify({ as }) }), {
     invalidate: FINANCE_KEYS,
     onSuccess: (r) => go(r.document.id),
   });
@@ -462,7 +560,17 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
       toast.success("Payment link copied");
     },
   });
-  const voidPayment = useApiMutation((id: string) => api(`finance/payments/${id}/void`, { method: "POST" }), { invalidate: FINANCE_KEYS, success: "Payment voided" });
+  const voidPayment = useApiMutation((id: string) => api(`finance/payments/${id}/void`, { method: "POST" }), { invalidate: FINANCE_KEYS, success: d.kind === "quote" ? "Receipt cancelled" : "Payment voided" });
+  const finalInvoice = useApiMutation(
+    () => api<{ document: { id: string }; number: string; emailError: string | null }>(`finance/documents/${d.id}/final-invoice`, { method: "POST", body: JSON.stringify({ email: true }) }),
+    {
+      invalidate: FINANCE_KEYS,
+      onSuccess: (r) => {
+        toast.success(`Invoice ${r.number} generated`, r.emailError ? { description: `Not emailed: ${r.emailError}` } : undefined);
+        go(r.document.id);
+      },
+    },
+  );
 
   return (
     <FinanceBody className="max-w-7xl">
@@ -472,7 +580,7 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 space-y-6">
           <div className="overflow-x-auto rounded-xl border border-secondary shadow-[0_24px_64px_-32px_rgb(0_0_0/0.5)]">
-            <InvoiceDocument doc={d} lines={detail.lines} seller={detail.seller} client={detail.client} className="min-w-[640px]" />
+            <InvoiceDocument doc={d} lines={detail.lines} seller={detail.seller} client={detail.client} receipts={detail.receipts} className="min-w-[640px]" />
           </div>
           {detail.installments ? <InstallmentsCard me={me} detail={detail} /> : null}
           <Card className="p-4 sm:p-6 print:hidden">
@@ -487,9 +595,21 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
               <span className="font-mono text-sm">{d.number}</span>
               <StatusPill status={status} />
             </div>
-            <div className="mt-3 font-display text-3xl font-bold">{money(d.kind === "invoice" && d.status !== "void" ? balance : d.total, d.currency)}</div>
+            <div className="mt-3 font-display text-3xl font-bold">{money((d.kind === "invoice" || (d.kind === "quote" && d.amountPaid > 0)) && d.status !== "void" ? balance : d.total, d.currency)}</div>
             <div className="text-sm text-tertiary">
-              {d.kind === "invoice" ? (d.status === "paid" ? `Paid in full${d.paidAt ? ` on ${formatDate(d.paidAt.slice(0, 10))}` : ""}` : d.status === "void" ? "Void" : nextDue ? `next instalment due ${formatDate(nextDue)}` : `due ${formatDate(d.dueDate)}`) : `${KIND_LABEL[d.kind].one} total`}
+              {d.kind === "invoice"
+                ? d.status === "paid"
+                  ? `Paid in full${d.paidAt ? ` on ${formatDate(d.paidAt.slice(0, 10))}` : ""}`
+                  : d.status === "void"
+                    ? "Void"
+                    : nextDue
+                      ? `next instalment due ${formatDate(nextDue)}`
+                      : `due ${formatDate(d.dueDate)}`
+                : d.kind === "quote" && d.amountPaid > 0
+                  ? d.status === "paid"
+                    ? `Paid in full · ${money(d.total, d.currency)}`
+                    : `left to pay of ${money(d.total, d.currency)}`
+                  : `${KIND_LABEL[d.kind].one} total`}
             </div>
             <p className="mt-1 text-xs text-tertiary">
               {detail.client.name}
@@ -506,6 +626,23 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
             {onPlan ? (
               <p className="mt-3 rounded-lg bg-secondary px-3 py-2 text-xs text-secondary">Being paid in instalments. Record payments, links and reminders from the schedule.</p>
             ) : null}
+            {quoteOpen ? (
+              <p className="mt-3 rounded-lg bg-secondary px-3 py-2 text-xs text-secondary">
+                Record each advance or part payment here. The client gets a receipt for each one, and you generate the final invoice once the quote is paid in full.
+              </p>
+            ) : null}
+            {d.kind === "quote" && d.status === "paid" && !detail.finalInvoice ? (
+              <p className="mt-3 rounded-lg bg-success-solid/15 px-3 py-2 text-xs text-success-primary">Paid in full. Generate the final tax invoice for it.</p>
+            ) : null}
+            {detail.finalInvoice ? (
+              <p className="mt-3 rounded-lg bg-secondary px-3 py-2 text-xs text-secondary">
+                Final invoice{" "}
+                <Link to="/finance/invoices/$id" params={{ id: detail.finalInvoice.id }} className="font-mono font-medium text-brand-secondary hover:underline">
+                  {detail.finalInvoice.number}
+                </Link>{" "}
+                has been generated.
+              </p>
+            ) : null}
             {detail.interestFor ? (
               <p className="mt-3 rounded-lg bg-secondary px-3 py-2 text-xs text-secondary">
                 Interest for instalment {detail.interestFor.seq} of{" "}
@@ -517,10 +654,27 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
             ) : null}
 
             <div className="mt-4 grid gap-2">
-              {unpaid && can(p, "payment", "record") ? (
-                <Button variant="primary" onClick={() => setPaying(true)}>
-                  <ReceiptIndianRupee /> Record payment
+              {d.kind === "quote" && d.status === "paid" && !detail.finalInvoice && can(p, "invoice", "create") && can(p, "invoice", "send") ? (
+                <Button variant="primary" onClick={() => finalInvoice.mutate(undefined)} disabled={finalInvoice.isPending}>
+                  <FileCheck2 /> Generate final invoice
                 </Button>
+              ) : null}
+              {(unpaid || quoteOpen) && can(p, "payment", "record") ? (
+                <Button variant="primary" onClick={() => setPaying(true)}>
+                  <ReceiptIndianRupee /> {quoteOpen ? "Record payment and receipt" : "Record payment"}
+                </Button>
+              ) : null}
+              {quoteOpen && detail.seller.razorpayConnected && can(p, "invoice", "send") ? (
+                <>
+                  {d.paymentLinkUrl ? (
+                    <Button onClick={() => (void navigator.clipboard?.writeText(d.paymentLinkUrl!), toast.success("Payment link copied"))}>
+                      <Link2 /> Copy link for {money(d.paymentLinkAmount ?? balance, d.currency)}
+                    </Button>
+                  ) : null}
+                  <Button onClick={() => setRequesting(true)}>
+                    <HandCoins /> {d.paymentLinkUrl ? "Request a different amount" : "Request a payment"}
+                  </Button>
+                </>
               ) : null}
               {unpaid && detail.seller.razorpayConnected && can(p, "invoice", "send") ? (
                 d.paymentLinkUrl ? (
@@ -549,11 +703,6 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
                   <Button onClick={() => quoteStatus.mutate("declined")}>Declined</Button>
                 </div>
               ) : null}
-              {d.kind === "quote" && d.status !== "void" && d.status !== "declined" && can(p, "invoice", "create") ? (
-                <Button variant={d.status === "accepted" ? "primary" : "secondary"} onClick={() => copy.mutate("invoice")}>
-                  <FileText /> Convert to invoice
-                </Button>
-              ) : null}
               {detail.publicUrl ? (
                 <Button asChild>
                   <a href={detail.publicUrl} target="_blank" rel="noreferrer">
@@ -574,7 +723,7 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
                   <FilePlus2 /> Issue a credit note
                 </Button>
               ) : null}
-              {d.status !== "void" && !locked && can(p, "invoice", "void") ? (
+              {d.status !== "void" && !locked && !(d.kind === "quote" && d.amountPaid > 0) && can(p, "invoice", "void") ? (
                 <Button variant="ghost" className="text-error-primary" onClick={() => confirm(`Void ${d.number}? The number stays used, and it no longer counts as owed.`) && voidDoc.mutate(undefined)}>
                   <Ban /> Void
                 </Button>
@@ -582,23 +731,35 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
             </div>
           </Card>
 
-          {d.kind === "invoice" ? (
+          {d.kind === "invoice" || (d.kind === "quote" && d.status !== "draft") ? (
             <Card className="p-5">
-              <h2 className="font-bold">Payments</h2>
-              {detail.payments.length === 0 ? <p className="mt-2 text-sm text-tertiary">Nothing received yet.</p> : null}
+              <h2 className="font-bold">{d.kind === "quote" ? "Receipts" : settledByReceipts ? "Paid against the quote" : "Payments"}</h2>
+              {paymentRows.length === 0 ? <p className="mt-2 text-sm text-tertiary">{d.kind === "quote" ? "No payments against this quote yet." : "Nothing received yet."}</p> : null}
               <ul className="mt-2 divide-y divide-border-secondary">
-                {detail.payments.map((pay) => (
+                {paymentRows.map((pay) => (
                   <li key={pay.id} className={cn("flex items-center gap-2 py-2 text-sm", pay.voidedAt && "text-tertiary line-through")}>
                     <div className="min-w-0 flex-1">
                       <div className="font-mono">{money(pay.amount, d.currency)}</div>
                       <div className="truncate text-xs text-tertiary">
+                        {pay.receiptNumber ? (
+                          <>
+                            <Link to="/finance/receipts/$id" params={{ id: pay.id }} className="font-mono text-brand-secondary hover:underline">
+                              {pay.receiptNumber}
+                            </Link>
+                            {" · "}
+                          </>
+                        ) : null}
                         {formatDate(pay.paidOn, { day: "numeric", month: "short" })} · {PAYMENT_METHOD_LABEL[pay.method] ?? pay.method}
                         {pay.reference ? ` · ${pay.reference}` : ""}
                       </div>
                     </div>
-                    {!pay.voidedAt && pay.method !== "credit_note" && can(p, "payment", "refund") ? (
-                      <Button size="sm" variant="ghost" onClick={() => confirm("Void this payment?") && voidPayment.mutate(pay.id)}>
-                        Void
+                    {!pay.voidedAt && pay.method !== "credit_note" && !detail.finalInvoice && !settledByReceipts && can(p, "payment", "refund") ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => confirm(pay.receiptNumber ? `Cancel receipt ${pay.receiptNumber}? Its number stays used, and the amount goes back on the quote's balance.` : "Void this payment?") && voidPayment.mutate(pay.id)}
+                      >
+                        {pay.receiptNumber ? "Cancel" : "Void"}
                       </Button>
                     ) : null}
                   </li>
@@ -627,6 +788,7 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
         </aside>
       </div>
       {paying ? <RecordPaymentDialog open onOpenChange={setPaying} detail={detail} /> : null}
+      {requesting ? <RequestPaymentDialog open onOpenChange={setRequesting} detail={detail} /> : null}
       {splitting ? <SplitDialog open onOpenChange={setSplitting} detail={detail} /> : null}
     </FinanceBody>
   );

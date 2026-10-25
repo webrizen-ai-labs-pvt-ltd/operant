@@ -28,12 +28,18 @@ import { assertNotOnPlan, effectiveDueDate, installmentForInterestInvoice, planP
 import {
   createPaymentLink,
   emailClient,
+  emailReceipt,
+  finalInvoiceFor,
   generateDueRecurring,
   issue,
   linkToken,
   loadClient,
   loadSettings,
+  OPEN_QUOTE,
   placeOfSupplyFor,
+  receiptsFor,
+  receiptView,
+  recordPayment,
   refreshPaid,
   writeLines,
 } from "./service.ts";
@@ -172,6 +178,8 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
     const { razorpayKeySecretEnc, razorpayWebhookSecretEnc, ...seller } = settings;
     const { publicTokenHash, ...doc } = inv;
     const interestFor = await installmentForInterestInvoice(db, inv.id);
+    // A quote's receipts; a final invoice shows the receipts that settled it.
+    const quoteId = inv.kind === "quote" ? inv.id : inv.kind === "invoice" && related.some((r) => r.id === inv.relatedId && r.kind === "quote") ? inv.relatedId : null;
     return c.json({
       document: doc,
       installments: inv.kind === "invoice" && inv.status !== "draft" ? await planView(db, inv.id) : null,
@@ -179,6 +187,8 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
       lines,
       payments: pays,
       related,
+      receipts: quoteId ? await receiptsFor(db, quoteId) : [],
+      finalInvoice: inv.kind === "quote" ? await finalInvoiceFor(db, inv.id) : null,
       client,
       project: project ?? null,
       seller: { ...seller, name: org!.name, razorpayConnected: Boolean(settings.razorpayKeyId && razorpayKeySecretEnc) },
@@ -345,17 +355,19 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
     return c.json({ ok: true });
   })
 
-  /** Copy into a new draft: duplicate, quote → invoice, or invoice → credit note. */
+  /**
+   * Copy into a new draft: duplicate, or invoice → credit note. A quote becomes an invoice only
+   * once it's fully paid (see final-invoice), never by copying.
+   */
   .post(
     "/finance/documents/:id/copy",
     requirePermission("invoice", "create"),
-    validate("json", z.object({ as: z.enum(["duplicate", "invoice", "credit_note"]) })),
+    validate("json", z.object({ as: z.enum(["duplicate", "credit_note"]) })),
     async (c) => {
       const { as } = c.req.valid("json");
       const { db } = c.get("deps");
       const org = c.get("org");
       const src = await loadDoc(c, c.req.param("id"));
-      if (as === "invoice" && src.kind !== "quote") throw new HTTPException(422, { message: "Only quotes convert to invoices" });
       if (as === "credit_note" && (src.kind !== "invoice" || src.status === "draft" || src.status === "void")) {
         throw new HTTPException(422, { message: "Credit notes are issued against issued invoices" });
       }
@@ -386,7 +398,6 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
         .returning({ id: invoices.id });
       const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, src.id)).orderBy(asc(invoiceLines.position));
       await writeLines(db, org.id, doc!.id, lines, src.supplyType, settings);
-      if (as === "invoice") await db.update(invoices).set({ status: "accepted" }).where(eq(invoices.id, src.id));
       await audit(c, `${kind}.created`, { type: kind, id: doc!.id }, { from: src.number ?? src.id, as });
       return c.json({ document: { id: doc!.id } }, 201);
     },
@@ -400,19 +411,97 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
       const { db } = c.get("deps");
       const inv = await loadDoc(c, c.req.param("id"));
       if (inv.kind !== "quote" || inv.status === "draft" || inv.status === "void") throw new HTTPException(409, { message: "Only issued quotes have this status" });
+      if (inv.amountPaid > 0) throw new HTTPException(409, { message: "This quote has payments against it" });
       await db.update(invoices).set({ status: c.req.valid("json").status }).where(eq(invoices.id, inv.id));
       return c.json({ ok: true });
     },
   )
 
-  .post("/finance/documents/:id/payment-link", requirePermission("invoice", "send"), async (c) => {
-    const deps = c.get("deps");
-    const inv = await loadDoc(c, c.req.param("id"));
-    await assertNotOnPlan(deps.db, inv, "Create payment links for each instalment instead.");
-    const url = await createPaymentLink(deps, inv, await loadSettings(deps.db, inv.orgId));
-    await audit(c, "invoice.payment_link", { type: "invoice", id: inv.id });
-    return c.json({ url });
-  })
+  /**
+   * The final tax invoice for a fully paid quote: the quote's lines, issued today, settled by the
+   * receipts already given against the quote.
+   */
+  .post(
+    "/finance/documents/:id/final-invoice",
+    requirePermission("invoice", "create"),
+    requirePermission("invoice", "send"),
+    validate("json", z.object({ email: z.boolean().default(true) })),
+    async (c) => {
+      const { email } = c.req.valid("json");
+      const deps = c.get("deps");
+      const { db } = deps;
+      const org = c.get("org");
+      const quote = await loadDoc(c, c.req.param("id"));
+      if (quote.kind !== "quote") throw new HTTPException(422, { message: "Final invoices are generated from quotes" });
+      if (quote.status !== "paid") throw new HTTPException(409, { message: "The quote has to be paid in full first. Record each payment against it; the client gets a receipt for each." });
+      const existing = await finalInvoiceFor(db, quote.id);
+      if (existing) throw new HTTPException(409, { message: `Invoice ${existing.number} has already been generated for this quote` });
+
+      const settings = await loadSettings(db, org.id);
+      const { timezone } = await orgWorkSettings(db, org.id);
+      const today = todayIn(timezone);
+      const [draft] = await db
+        .insert(invoices)
+        .values({
+          orgId: org.id,
+          kind: "invoice",
+          clientId: quote.clientId,
+          projectId: quote.projectId,
+          milestoneId: quote.milestoneId,
+          relatedId: quote.id,
+          issueDate: today,
+          dueDate: today,
+          currency: quote.currency,
+          placeOfSupply: quote.placeOfSupply,
+          supplyType: quote.supplyType,
+          notes: quote.notes,
+          terms: quote.terms,
+          createdBy: c.get("viewer")!.userId,
+        })
+        .returning();
+      const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, quote.id)).orderBy(asc(invoiceLines.position));
+      const totals = await writeLines(db, org.id, draft!.id, lines, quote.supplyType, settings);
+      if (totals.total !== quote.total) {
+        // The seller's GST registration or round-off setting changed since the quote: the receipts no longer match.
+        await db.delete(invoices).where(eq(invoices.id, draft!.id));
+        throw new HTTPException(409, { message: "The tax settings have changed since this quote, so its total no longer matches. Contact support to settle it." });
+      }
+      const [fresh] = await db.select().from(invoices).where(eq(invoices.id, draft!.id));
+      const { number, token } = await issue(deps, fresh!, settings);
+      await refreshPaid(db, draft!.id);
+      const [sent] = await db.select().from(invoices).where(eq(invoices.id, draft!.id));
+      const mail = email ? await emailClient(deps, settings, org.name, sent!, token, "issued") : null;
+      const emailed = Boolean(mail?.sent);
+      await audit(c, "invoice.issued", { type: "invoice", id: draft!.id }, { number, from: quote.number, final: true, emailed });
+      return c.json(
+        { document: { id: draft!.id }, number, emailed, emailError: mail && !mail.sent ? MAIL_REASON[mail.reason] + (mail.error ? `: ${mail.error}` : "") : null },
+        201,
+      );
+    },
+  )
+
+  /** A Razorpay link: an invoice's balance, or a payment against a quote (an advance, by default its balance). */
+  .post(
+    "/finance/documents/:id/payment-link",
+    requirePermission("invoice", "send"),
+    validate("json", z.object({ amount: z.number().int().positive().optional(), email: z.boolean().default(false) })),
+    async (c) => {
+      const { amount, email } = c.req.valid("json");
+      const deps = c.get("deps");
+      const inv = await loadDoc(c, c.req.param("id"));
+      await assertNotOnPlan(deps.db, inv, "Create payment links for each instalment instead.");
+      const settings = await loadSettings(deps.db, inv.orgId);
+      const url = await createPaymentLink(deps, inv, settings, amount);
+      let emailError: string | null = null;
+      if (email) {
+        const [fresh] = await deps.db.select().from(invoices).where(eq(invoices.id, inv.id));
+        const mail = await emailClient(deps, settings, c.get("org").name, fresh!, await linkToken(deps, inv.id), inv.kind === "quote" ? "payment_request" : "reminder");
+        if (!mail.sent) emailError = MAIL_REASON[mail.reason] + (mail.error ? `: ${mail.error}` : "");
+      }
+      await audit(c, `${inv.kind}.payment_link`, { type: inv.kind, id: inv.id }, { amount: amount ?? inv.total - inv.amountPaid });
+      return c.json({ url, emailed: email && !emailError, emailError });
+    },
+  )
 
   /* ---------------- Payments ---------------- */
 
@@ -424,6 +513,8 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
         id: payments.id,
         invoiceId: payments.invoiceId,
         invoiceNumber: invoices.number,
+        invoiceKind: invoices.kind,
+        receiptNumber: payments.receiptNumber,
         clientId: payments.clientId,
         clientName: clients.name,
         amount: payments.amount,
@@ -453,25 +544,32 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
         paidOn: isoDate,
         reference: z.string().trim().max(120).nullish(),
         notes: z.string().trim().max(1000).nullish(),
+        /** Quotes: email the client their receipt. */
+        email: z.boolean().default(true),
       }),
     ),
     async (c) => {
-      const input = c.req.valid("json");
-      const { db } = c.get("deps");
+      const { email, ...input } = c.req.valid("json");
+      const deps = c.get("deps");
+      const { db } = deps;
       const inv = await loadDoc(c, c.req.param("id"));
-      if (inv.kind !== "invoice" || !["sent", "partially_paid"].includes(inv.status)) {
-        throw new HTTPException(409, { message: "Payments are recorded against issued, unpaid invoices" });
-      }
+      // Quotes take advances and part payments (each gets a receipt); unpaid invoices take the rest.
+      const open = inv.kind === "quote" ? (OPEN_QUOTE as readonly string[]).includes(inv.status) : inv.kind === "invoice" && ["sent", "partially_paid"].includes(inv.status);
+      if (!open) throw new HTTPException(409, { message: "Payments are recorded against issued quotes and invoices that aren't fully paid" });
       await assertNotOnPlan(db, inv, "Record payments against an instalment instead.");
       const balance = inv.total - inv.amountPaid;
-      if (input.amount > balance) throw new HTTPException(422, { message: "That's more than what's owed on this invoice" });
-      const [row] = await db
-        .insert(payments)
-        .values({ ...input, orgId: inv.orgId, invoiceId: inv.id, clientId: inv.clientId, createdBy: c.get("viewer")!.userId })
-        .returning({ id: payments.id });
-      await refreshPaid(db, inv.id);
-      await audit(c, "payment.recorded", { type: "invoice", id: inv.id }, { amount: input.amount, method: input.method });
-      return c.json({ payment: row }, 201);
+      if (input.amount > balance) throw new HTTPException(422, { message: `That's more than what's owed on this ${inv.kind === "quote" ? "quote" : "invoice"}` });
+      const payment = (await recordPayment(db, inv, { ...input, createdBy: c.get("viewer")!.userId }))!;
+      const mail = inv.kind === "quote" && email ? await emailReceipt(deps, inv, payment) : null;
+      await audit(c, "payment.recorded", { type: inv.kind, id: inv.id }, { amount: input.amount, method: input.method, receipt: payment.receiptNumber });
+      return c.json(
+        {
+          payment: { id: payment.id, receiptNumber: payment.receiptNumber },
+          emailed: Boolean(mail?.sent),
+          emailError: mail && !mail.sent ? MAIL_REASON[mail.reason] + (mail.error ? `: ${mail.error}` : "") : null,
+        },
+        201,
+      );
     },
   )
 
@@ -480,13 +578,30 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
     const [p] = await db.select().from(payments).where(and(eq(payments.orgId, c.get("org").id), eq(payments.id, c.req.param("id"))));
     if (!p || p.voidedAt) notFound("Payment not found");
     if (p.method === "credit_note") throw new HTTPException(409, { message: "Void the credit note instead" });
+    const settled = p.receiptNumber ? await finalInvoiceFor(db, p.invoiceId) : null;
+    if (settled) throw new HTTPException(409, { message: `This receipt settles invoice ${settled.number}. Void that invoice first.` });
     if (p.installmentId) await voidInstallmentPayment(db, p);
     else {
       await db.update(payments).set({ voidedAt: new Date() }).where(eq(payments.id, p.id));
       await refreshPaid(db, p.invoiceId);
     }
-    await audit(c, "payment.voided", { type: "invoice", id: p.invoiceId }, { amount: p.amount });
+    await audit(c, "payment.voided", { type: p.receiptNumber ? "quote" : "invoice", id: p.invoiceId }, { amount: p.amount, receipt: p.receiptNumber });
     return c.json({ ok: true });
+  })
+
+  /** One receipt, with what it was received against, for the printable receipt. */
+  .get("/finance/receipts/:id", requirePermission("payment", "read"), async (c) => {
+    const { db } = c.get("deps");
+    const [p] = await db.select().from(payments).where(and(eq(payments.orgId, c.get("org").id), eq(payments.id, c.req.param("id"))));
+    if (!p?.receiptNumber) notFound("Receipt not found");
+    const quote = await loadDoc(c, p.invoiceId);
+    const [client] = await db.select().from(clients).where(eq(clients.id, quote.clientId));
+    const lines = await db.select().from(invoiceLines).where(eq(invoiceLines.invoiceId, quote.id)).orderBy(asc(invoiceLines.position));
+    const settings = await loadSettings(db, quote.orgId);
+    const [org] = await db.select({ name: orgs.name }).from(orgs).where(eq(orgs.id, quote.orgId));
+    const { razorpayKeySecretEnc: _, razorpayWebhookSecretEnc: __, ...seller } = settings;
+    const { publicTokenHash: ___, ...doc } = quote;
+    return c.json({ receipt: receiptView(p), quote: doc, receipts: await receiptsFor(db, quote.id), lines, client, seller: { ...seller, name: org!.name } });
   })
 
   /* ---------------- Retainers ---------------- */
