@@ -1,11 +1,12 @@
-import { can, PILLARS, type Pillar, type TermKey } from "@operant/core";
-import { Avatar, Badge, Button, ButtonGroup, ButtonGroupItem, Card, cn, Input, Label, ToggleBase } from "@operant/ui";
+import { can, INDIAN_STATES, isValidGstin, PILLARS, type Pillar, stateOfGstin, type TermKey } from "@operant/core";
+import { Avatar, Badge, Button, ButtonGroup, ButtonGroupItem, Card, cn, Field, Input, Label, Select, Textarea, ToggleBase } from "@operant/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Moon, Sun, SunMoon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/app-shell.tsx";
 import { api, type Me } from "../lib/api.ts";
+import { FINANCE_KEYS, useFinanceSettings } from "../lib/finance.ts";
 import { MAIN_NAV } from "../lib/nav.ts";
 import { useTheme } from "../lib/theme.ts";
 
@@ -16,10 +17,35 @@ export function OrgSettingsPage({ me }: { me: Me }) {
   const [pillars, setPillars] = useState<Pillar[]>(me.settings.enabledPillars);
   const [workWeek, setWorkWeek] = useState<number[]>(me.settings.workWeek);
 
+  // Business details are the ones printed on invoices, receipts and quotes (shared with Finance settings).
+  const { data: finance } = useFinanceSettings();
+  const [details, setDetails] = useState<BusinessDetails | null>(null);
+  useEffect(() => {
+    if (finance && !details) {
+      const f = finance.settings;
+      setDetails({ gstin: f.gstin ?? "", stateCode: f.stateCode ?? "", address: f.address ?? "", email: f.email ?? "", phone: f.phone ?? "" });
+    }
+  }, [finance, details]);
+  const gstinValid = !details?.gstin || isValidGstin(details.gstin);
+
   const save = useMutation({
-    mutationFn: () => api("settings", { method: "PATCH", body: JSON.stringify({ terms, enabledPillars: pillars, workWeek }) }),
+    mutationFn: async () => {
+      await api("settings", { method: "PATCH", body: JSON.stringify({ terms, enabledPillars: pillars, workWeek }) });
+      if (details) {
+        await api("finance/settings", {
+          method: "PATCH",
+          body: JSON.stringify({
+            gstin: details.gstin || null,
+            stateCode: details.stateCode || null,
+            address: details.address.trim() || null,
+            email: details.email.trim() || null,
+            phone: details.phone.trim() || null,
+          }),
+        });
+      }
+    },
     onSuccess: async () => {
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await Promise.all([qc.invalidateQueries({ queryKey: ["me"] }), ...FINANCE_KEYS.map((k) => qc.invalidateQueries({ queryKey: [k] }))]);
       toast.success("Settings saved");
     },
     onError: (e) => toast.error(e.message),
@@ -47,6 +73,8 @@ export function OrgSettingsPage({ me }: { me: Me }) {
           <Badge className="ml-auto">{me.settings.currency}</Badge>
         </div>
       </Card>
+
+      {details ? <BusinessDetailsCard details={details} onChange={setDetails} canManage={canManage} gstinValid={gstinValid} /> : null}
 
       <Card className="p-6">
         <h2 className="text-lg font-bold">Pillars</h2>
@@ -126,7 +154,7 @@ export function OrgSettingsPage({ me }: { me: Me }) {
 
       {canManage ? (
         <div className="flex justify-end">
-          <Button variant="primary" onClick={() => save.mutate()} disabled={save.isPending}>
+          <Button variant="primary" onClick={() => save.mutate()} disabled={save.isPending || !gstinValid}>
             {save.isPending ? "Saving…" : "Save changes"}
           </Button>
         </div>
@@ -134,6 +162,74 @@ export function OrgSettingsPage({ me }: { me: Me }) {
         <p className="text-sm text-tertiary">You need the settings permission to change these.</p>
       )}
     </div>
+  );
+}
+
+interface BusinessDetails {
+  gstin: string;
+  stateCode: string;
+  address: string;
+  email: string;
+  phone: string;
+}
+
+/** GST number, address and contact details: printed on every invoice, receipt and quote. */
+function BusinessDetailsCard({
+  details,
+  onChange,
+  canManage,
+  gstinValid,
+}: {
+  details: BusinessDetails;
+  onChange: (d: BusinessDetails) => void;
+  canManage: boolean;
+  gstinValid: boolean;
+}) {
+  const set = (k: keyof BusinessDetails, v: string) => {
+    const next = { ...details, [k]: v };
+    // A GSTIN's first two digits are the state.
+    if (k === "gstin" && v && isValidGstin(v)) next.stateCode = stateOfGstin(v);
+    onChange(next);
+  };
+  return (
+    <Card className="p-6">
+      <h2 className="text-lg font-bold">Business details</h2>
+      <p className="mt-1 text-sm text-tertiary">Printed on your invoices, receipts and quotes. Also editable in Finance settings.</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <Field
+          label="GST number (optional)"
+          error={gstinValid ? null : "That GST number isn't valid"}
+          hint={details.gstin && gstinValid ? INDIAN_STATES[stateOfGstin(details.gstin)] : "Leave blank if you aren't GST-registered. Invoices then go out without GST."}
+        >
+          <Input
+            value={details.gstin}
+            onChange={(e) => set("gstin", e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 15))}
+            disabled={!canManage}
+            className="font-mono"
+            placeholder="27AAPFU0939F1ZV"
+          />
+        </Field>
+        <Field label="State" hint="Taken from your GST number when set">
+          <Select value={details.stateCode} onChange={(e) => set("stateCode", e.target.value)} disabled={!canManage || Boolean(details.gstin && gstinValid)}>
+            <option value="">Choose your state</option>
+            {Object.entries(INDIAN_STATES).map(([code, name]) => (
+              <option key={code} value={code}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Address" className="sm:col-span-2">
+          <Textarea value={details.address} onChange={(e) => set("address", e.target.value)} disabled={!canManage} className="min-h-16" maxLength={500} placeholder="Street, city, PIN code" />
+        </Field>
+        <Field label="Contact email" hint="Shown on invoices; client replies come here">
+          <Input type="email" value={details.email} onChange={(e) => set("email", e.target.value)} disabled={!canManage} maxLength={254} />
+        </Field>
+        <Field label="Contact phone">
+          <Input type="tel" value={details.phone} onChange={(e) => set("phone", e.target.value)} disabled={!canManage} maxLength={32} />
+        </Field>
+      </div>
+    </Card>
   );
 }
 
