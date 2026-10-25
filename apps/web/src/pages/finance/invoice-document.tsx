@@ -102,7 +102,20 @@ export function InvoiceDocument({
 
       <section className="mt-5 grid grid-cols-2 gap-6">
         <div>
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 text-[#5f574e]">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Bill to</div>
+          <div className="mt-1 font-semibold">{client.legalName ?? client.name}</div>
+          {client.billingAddress ? <div className="whitespace-pre-line text-[#5f574e]">{client.billingAddress}</div> : null}
+          {client.country !== "IN" ? <div className="text-[#5f574e]">{client.country}</div> : null}
+          {client.gstin ? (
+            <div className="text-[#5f574e]">
+              GSTIN <b className="font-mono text-[#1a1715]">{client.gstin}</b>
+            </div>
+          ) : client.stateCode ? (
+            <div className="text-[#5f574e]">{state(client.stateCode)}</div>
+          ) : null}
+        </div>
+        <div className="text-right">
+          <dl className="grid grid-cols-[auto_auto] justify-end gap-x-4 text-[#5f574e]">
             <dt>{doc.kind === "quote" ? "Quotation no." : doc.kind === "credit_note" ? "Credit note no." : "Invoice no."}</dt>
             <dd className="font-mono font-semibold text-[#1a1715]">{doc.number ?? "Draft"}</dd>
             <dt>Date</dt>
@@ -121,19 +134,6 @@ export function InvoiceDocument({
             ) : null}
           </dl>
           {doc.supplyType === "export" ? <div className="mt-1 text-[#5f574e]">Export of services, zero-rated (under LUT)</div> : null}
-        </div>
-        <div className="text-right">
-          <div className="text-[11px] font-semibold uppercase tracking-wider text-[#8a8178]">Bill to</div>
-          <div className="mt-1 font-semibold">{client.legalName ?? client.name}</div>
-          {client.billingAddress ? <div className="whitespace-pre-line text-[#5f574e]">{client.billingAddress}</div> : null}
-          {client.country !== "IN" ? <div className="text-[#5f574e]">{client.country}</div> : null}
-          {client.gstin ? (
-            <div className="text-[#5f574e]">
-              GSTIN <b className="font-mono text-[#1a1715]">{client.gstin}</b>
-            </div>
-          ) : client.stateCode ? (
-            <div className="text-[#5f574e]">{state(client.stateCode)}</div>
-          ) : null}
         </div>
       </section>
 
