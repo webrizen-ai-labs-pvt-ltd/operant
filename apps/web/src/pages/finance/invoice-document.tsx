@@ -59,6 +59,7 @@ export function InvoiceDocument({
 
       <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#1a1715] pb-5">
         <div className="max-w-sm">
+          {seller.logo ? <img src={seller.logo} alt="" className="mb-3 max-h-14 max-w-[220px] object-contain object-left" /> : null}
           <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
           {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
           <div className="mt-1 space-x-3 text-[#5f574e]">
@@ -335,6 +336,7 @@ export function ReceiptDocument({
 
       <header className="flex flex-wrap items-start justify-between gap-6 border-b-2 border-[#1a1715] pb-5">
         <div className="max-w-sm">
+          {seller.logo ? <img src={seller.logo} alt="" className="mb-3 max-h-14 max-w-[220px] object-contain object-left" /> : null}
           <div className="font-display text-xl font-bold">{seller.legalName ?? seller.name}</div>
           {seller.address ? <div className="whitespace-pre-line text-[#5f574e]">{seller.address}</div> : null}
           <div className="mt-1 space-x-3 text-[#5f574e]">

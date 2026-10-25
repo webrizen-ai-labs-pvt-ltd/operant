@@ -1,8 +1,8 @@
 import { can, INDIAN_STATES, isValidGstin, PILLARS, type Pillar, stateOfGstin, type TermKey } from "@operant/core";
 import { Avatar, Badge, Button, ButtonGroup, ButtonGroupItem, Card, cn, Field, Input, Label, Select, Textarea, ToggleBase } from "@operant/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Moon, Sun, SunMoon } from "lucide-react";
-import { useEffect, useState } from "react";
+import { ImageUp, Moon, Sun, SunMoon, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "../components/app-shell.tsx";
 import { api, type Me } from "../lib/api.ts";
@@ -23,7 +23,7 @@ export function OrgSettingsPage({ me }: { me: Me }) {
   useEffect(() => {
     if (finance && !details) {
       const f = finance.settings;
-      setDetails({ gstin: f.gstin ?? "", stateCode: f.stateCode ?? "", address: f.address ?? "", email: f.email ?? "", phone: f.phone ?? "" });
+      setDetails({ logo: f.logo ?? null, gstin: f.gstin ?? "", stateCode: f.stateCode ?? "", address: f.address ?? "", email: f.email ?? "", phone: f.phone ?? "" });
     }
   }, [finance, details]);
   const gstinValid = !details?.gstin || isValidGstin(details.gstin);
@@ -35,6 +35,7 @@ export function OrgSettingsPage({ me }: { me: Me }) {
         await api("finance/settings", {
           method: "PATCH",
           body: JSON.stringify({
+            logo: details.logo,
             gstin: details.gstin || null,
             stateCode: details.stateCode || null,
             address: details.address.trim() || null,
@@ -166,6 +167,8 @@ export function OrgSettingsPage({ me }: { me: Me }) {
 }
 
 interface BusinessDetails {
+  /** Data URL, or null for no logo. */
+  logo: string | null;
   gstin: string;
   stateCode: string;
   address: string;
@@ -185,7 +188,7 @@ function BusinessDetailsCard({
   canManage: boolean;
   gstinValid: boolean;
 }) {
-  const set = (k: keyof BusinessDetails, v: string) => {
+  const set = (k: Exclude<keyof BusinessDetails, "logo">, v: string) => {
     const next = { ...details, [k]: v };
     // A GSTIN's first two digits are the state.
     if (k === "gstin" && v && isValidGstin(v)) next.stateCode = stateOfGstin(v);
@@ -195,6 +198,7 @@ function BusinessDetailsCard({
     <Card className="p-6">
       <h2 className="text-lg font-bold">Business details</h2>
       <p className="mt-1 text-sm text-tertiary">Printed on your invoices, receipts and quotes. Also editable in Finance settings.</p>
+      <LogoField logo={details.logo} onChange={(logo) => onChange({ ...details, logo })} canManage={canManage} />
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <Field
           label="GST number (optional)"
@@ -230,6 +234,87 @@ function BusinessDetailsCard({
         </Field>
       </div>
     </Card>
+  );
+}
+
+/** Largest logo we keep, as base64 characters (the server allows a little more). */
+const MAX_LOGO_CHARS = 380_000;
+
+/**
+ * Shrink an image to fit 600 × 240 (plenty for a document header) and encode it as PNG,
+ * or WebP when the PNG would be too large. Returns null if it can't be made small enough.
+ */
+async function prepareLogo(file: File): Promise<string | null> {
+  const url = URL.createObjectURL(file);
+  try {
+    // onload rather than decode(): decode() never settles for detached images in some browsers.
+    const img = new Image();
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
+    });
+    const scale = Math.min(1, 600 / img.naturalWidth, 240 / img.naturalHeight);
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    canvas.getContext("2d")!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    for (const [type, quality] of [["image/png", undefined], ["image/webp", 0.9], ["image/webp", 0.75]] as const) {
+      const data = canvas.toDataURL(type, quality);
+      if (data.startsWith(`data:${type}`) && data.length <= MAX_LOGO_CHARS) return data;
+    }
+    return null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+function LogoField({ logo, onChange, canManage }: { logo: string | null; onChange: (logo: string | null) => void; canManage: boolean }) {
+  const input = useRef<HTMLInputElement>(null);
+  const pick = async (file: File | undefined) => {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast.error("Upload a PNG, JPEG or WebP image");
+      return;
+    }
+    try {
+      const data = await prepareLogo(file);
+      if (data) onChange(data);
+      else toast.error("That image is too detailed to use as a logo. Try a simpler or smaller one.");
+    } catch {
+      toast.error("Couldn't read that image");
+    }
+  };
+  return (
+    <div className="mt-4 flex flex-wrap items-center gap-4">
+      <div className="flex h-20 w-48 items-center justify-center rounded-xl bg-white p-2 ring-1 ring-secondary">
+        {logo ? <img src={logo} alt="Company logo" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-[#8a8178]">No logo</span>}
+      </div>
+      <div className="space-y-2">
+        <div className="text-sm font-medium text-secondary">Company logo</div>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="secondary" disabled={!canManage} onClick={() => input.current?.click()}>
+            <ImageUp /> {logo ? "Replace" : "Upload logo"}
+          </Button>
+          {logo ? (
+            <Button size="sm" variant="ghost" disabled={!canManage} onClick={() => onChange(null)}>
+              <Trash2 /> Remove
+            </Button>
+          ) : null}
+        </div>
+        <p className="text-xs text-tertiary">PNG, JPEG or WebP. A wide logo on a transparent or white background prints best.</p>
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          void pick(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+    </div>
   );
 }
 

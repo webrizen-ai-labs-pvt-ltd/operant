@@ -54,6 +54,14 @@ describe("settings", () => {
     orgId = s.json.webhookUrl.split("/razorpay/")[1]!.split("/")[0]!;
   });
 
+  it("keeps a small raster logo, and refuses SVG or oversized images", async () => {
+    const png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    expect((await t.call("fia", "/finance/settings", { logo: "data:image/svg+xml;base64,PHN2Zy8+" }, "PATCH")).status).toBe(400);
+    expect((await t.call("fia", "/finance/settings", { logo: `data:image/png;base64,${"A".repeat(400_000)}` }, "PATCH")).status).toBe(400);
+    expect((await t.call("fia", "/finance/settings", { logo: png }, "PATCH")).status).toBe(200);
+    expect((await t.call<{ settings: { logo: string } }>("fia", "/finance/settings")).json.settings.logo).toBe(png);
+  });
+
   it("is managed by admins only", async () => {
     expect((await t.call("ace", "/finance/settings", { legalName: "X" }, "PATCH")).status).toBe(403);
   });
@@ -211,6 +219,7 @@ describe("client links", () => {
     const pub = await t.call<{ document: { number: string }; seller: { legalName: string }; canPayOnline: boolean }>(null, `/public/invoices/${url.slice(3)}`);
     expect(pub.status).toBe(200);
     expect(pub.json.seller.legalName).toBe("Acme Studio LLP");
+    expect((pub.json.seller as { logo?: string }).logo).toMatch(/^data:image\/png;base64,/);
     expect(pub.json.canPayOnline).toBe(true);
     expect(JSON.stringify(pub.json)).not.toMatch(/razorpay|orgId|createdBy/i);
     expect((await t.call(null, "/public/invoices/not-a-real-token-at-all-123456")).status).toBe(404);

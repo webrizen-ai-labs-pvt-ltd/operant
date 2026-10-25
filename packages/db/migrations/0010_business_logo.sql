@@ -1,0 +1,1 @@
+ALTER TABLE "finance_settings" ADD COLUMN "logo" text;

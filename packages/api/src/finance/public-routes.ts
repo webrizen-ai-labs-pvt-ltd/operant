@@ -87,6 +87,7 @@ export const financePublicRoutes = new Hono<AppEnv>()
         address: settings.address,
         email: settings.email,
         phone: settings.phone,
+        logo: settings.logo,
         bank: settings.bank,
       },
       installments: schedule

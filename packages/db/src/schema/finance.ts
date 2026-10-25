@@ -45,6 +45,8 @@ export const financeSettings = pgTable("finance_settings", {
   address: text("address"),
   email: text("email"),
   phone: text("phone"),
+  /** Company logo for invoices, receipts and quotes: a small PNG, JPEG or WebP as a data URL. */
+  logo: text("logo"),
   invoicePrefix: text("invoice_prefix").notNull().default("INV"),
   quotePrefix: text("quote_prefix").notNull().default("QT"),
   creditNotePrefix: text("credit_note_prefix").notNull().default("CN"),

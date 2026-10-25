@@ -79,6 +79,8 @@ export interface Seller {
   address: string | null;
   email: string | null;
   phone: string | null;
+  /** Company logo as a data URL (PNG, JPEG or WebP). */
+  logo?: string | null;
   bank: BankDetails;
 }
 

@@ -44,6 +44,9 @@ function isUnique(err: unknown) {
   return (e?.cause?.code ?? e?.code) === "23505";
 }
 
+/** About 300 KB of image, base64-encoded. */
+const MAX_LOGO_CHARS = 400_000;
+
 const settingsInput = z
   .object({
     legalName: text(200),
@@ -59,6 +62,12 @@ const settingsInput = z
     address: text(500),
     email,
     phone: text(32),
+    /** A small PNG, JPEG or WebP as a data URL (no SVG: it can carry scripts). Null removes it. */
+    logo: z
+      .string()
+      .max(MAX_LOGO_CHARS, "Use a smaller logo (under 300 KB)")
+      .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/, "Upload a PNG, JPEG or WebP image")
+      .nullable(),
     invoicePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),
     quotePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),
     creditNotePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9-]{1,6}$/, "Up to 6 letters or digits"),

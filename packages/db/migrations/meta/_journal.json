@@ -71,6 +71,13 @@
       "when": 1792911037398,
       "tag": "0009_quote_counter_offers",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792918302988,
+      "tag": "0010_business_logo",
+      "breakpoints": true
     }
   ]
 }
