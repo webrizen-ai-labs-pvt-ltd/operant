@@ -201,7 +201,12 @@ export function DocumentsPage({ me, kind }: { me: Me; kind: "invoice" | "quote" 
                       <td className="px-5 py-3.5 text-tertiary">{formatDate(d.issueDate, { day: "numeric", month: "short" })}</td>
                       <td className={cn("px-4 py-3", st === "overdue" ? "text-error-primary" : "text-tertiary")}>{formatDate(d.dueDate, { day: "numeric", month: "short" })}</td>
                       <td className="px-5 py-3.5">
-                        <StatusPill status={st} />
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <StatusPill status={st} />
+                          {d.counterPending ? (
+                            <span className="rounded-full bg-warning-primary px-2 py-0.5 text-[11px] font-medium text-warning-primary">Price proposed</span>
+                          ) : null}
+                        </span>
                       </td>
                       <td className="px-5 py-3.5 text-right font-mono">{money(d.total, d.currency)}</td>
                       {effectiveKind === "invoice" ? (
@@ -768,6 +773,8 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
             </Card>
           ) : null}
 
+          {detail.counterOffers.length ? <CounterOffersCard me={me} detail={detail} /> : null}
+
           {detail.related.length ? (
             <Card className="p-5">
               <h2 className="font-bold">Related</h2>
@@ -791,6 +798,81 @@ function DocumentView({ me, detail }: { me: Me; detail: DocDetail }) {
       {requesting ? <RequestPaymentDialog open onOpenChange={setRequesting} detail={detail} /> : null}
       {splitting ? <SplitDialog open onOpenChange={setSplitting} detail={detail} /> : null}
     </FinanceBody>
+  );
+}
+
+/** Prices the client proposed for a quote from the portal: approve (a revised quote at that price) or reject. */
+function CounterOffersCard({ me, detail }: { me: Me; detail: DocDetail }) {
+  const navigate = useNavigate();
+  const d = detail.document;
+  const p = me.org.permissions;
+  const canApprove = can(p, "invoice", "create") && can(p, "invoice", "send");
+  const approve = useApiMutation((id: string) => api<{ document: { id: string }; number: string }>(`finance/documents/${d.id}/counter-offers/${id}/approve`, { method: "POST" }), {
+    invalidate: FINANCE_KEYS,
+    onSuccess: (r) => {
+      toast.success(`Revised quote ${r.number} issued and accepted`);
+      navigate({ to: "/finance/invoices/$id", params: { id: r.document.id } });
+    },
+  });
+  const reject = useApiMutation(
+    ({ id, reason }: { id: string; reason: string }) => api(`finance/documents/${d.id}/counter-offers/${id}/reject`, { method: "POST", body: JSON.stringify({ reason: reason || null }) }),
+    { invalidate: FINANCE_KEYS, success: "Proposal rejected. The client has been told." },
+  );
+  const LABEL = { pending: "Waiting for you", approved: "Approved", rejected: "Rejected", withdrawn: "Superseded" } as const;
+  return (
+    <Card className="p-5">
+      <h2 className="font-bold">Client's proposed price</h2>
+      <ul className="mt-2 divide-y divide-border-secondary">
+        {detail.counterOffers.map((o) => {
+          const off = d.total ? Math.round(((d.total - o.amount) / d.total) * 100) : 0;
+          return (
+            <li key={o.id} className="py-3 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-base font-semibold">{money(o.amount, d.currency)}</span>
+                <span className={cn("text-xs", o.status === "pending" ? "font-medium text-warning-primary" : "text-tertiary")}>{LABEL[o.status]}</span>
+              </div>
+              <div className="text-xs text-tertiary">
+                {off > 0 ? `${off}% below the quote` : off < 0 ? `${-off}% above the quote` : "Same as the quote"} · {o.byName ?? o.byEmail ?? "Client"} · {formatDate(o.createdAt.slice(0, 10), { day: "numeric", month: "short" })}
+              </div>
+              {o.note ? <p className="mt-1.5 rounded-md bg-secondary px-2.5 py-1.5 text-xs text-secondary">{o.note}</p> : null}
+              {o.status === "rejected" && o.response ? <p className="mt-1 text-xs text-tertiary">Your reply: {o.response}</p> : null}
+              {o.status === "approved" && o.revisedQuoteId ? (
+                <Link to="/finance/invoices/$id" params={{ id: o.revisedQuoteId }} className="mt-1 inline-block text-xs font-medium text-brand-secondary hover:underline">
+                  Open the revised quote
+                </Link>
+              ) : null}
+              {o.status === "pending" && d.status === "sent" ? (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {canApprove ? (
+                    <Button
+                      variant="primary"
+                      disabled={approve.isPending}
+                      onClick={() =>
+                        confirm(`Approve ${money(o.amount, d.currency)}? A revised quote at that price replaces ${d.number}, already accepted, and the client is told.`) &&
+                        approve.mutate(o.id)
+                      }
+                    >
+                      Approve
+                    </Button>
+                  ) : null}
+                  {can(p, "invoice", "update") ? (
+                    <Button
+                      disabled={reject.isPending}
+                      onClick={() => {
+                        const reason = prompt("Reject this price? Tell the client why (optional). The quote stays as it is.");
+                        if (reason !== null) reject.mutate({ id: o.id, reason: reason.trim() });
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
   );
 }
 

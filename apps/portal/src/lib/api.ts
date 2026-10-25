@@ -126,7 +126,7 @@ export interface RequestDetail {
     createdAt: string;
     service: { name: string; priceLabel: string; deliveryDays: number | null } | null;
     handler: Person | null;
-    quote: { id: string; number: string; status: string; total: number; currency: string; validUntil: string | null; url: string } | null;
+    quote: { id: string; number: string; status: string; total: number; currency: string; validUntil: string | null; url: string; counterOffer: CounterOffer | null } | null;
     project: { id: string; name: string } | null;
   };
   messages: Message[];
@@ -141,6 +141,14 @@ export interface ProjectDetail {
   documents: ChecklistItem[];
 }
 
+/** The client's latest proposed price for a quote. */
+export interface CounterOffer {
+  amount: number;
+  status: "pending" | "approved" | "rejected" | "withdrawn";
+  response: string | null;
+  createdAt: string;
+}
+
 export interface BillingDoc {
   id: string;
   kind: "invoice" | "quote" | "credit_note";
@@ -152,6 +160,7 @@ export interface BillingDoc {
   amountPaid: number;
   currency: string;
   url: string;
+  counterOffer: CounterOffer | null;
 }
 
 /* ---------------- Queries ---------------- */

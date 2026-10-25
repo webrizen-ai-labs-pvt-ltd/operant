@@ -23,6 +23,7 @@ import type { AppEnv } from "../context.ts";
 import { forbid, hasPermission, notFound, orgWorkSettings } from "../helpers.ts";
 import { requirePermission } from "../middleware.ts";
 import { likePattern, validate } from "../validate.ts";
+import { approveCounterOffer, counterOffersFor, rejectCounterOffer } from "./counter-offers.ts";
 import { MAIL_REASON } from "./email.ts";
 import { assertNotOnPlan, effectiveDueDate, installmentForInterestInvoice, planPrincipalByDueDate, planView, voidInstallmentPayment } from "./installments.ts";
 import {
@@ -111,6 +112,7 @@ function listQuery(db: AppEnv["Variables"]["deps"]["db"]) {
       recurringId: invoices.recurringId,
       sentAt: invoices.sentAt,
       createdAt: invoices.createdAt,
+      counterPending: sql<boolean>`exists (select 1 from quote_counter_offers o where o.quote_id = ${invoices.id} and o.status = 'pending')`,
     })
     .from(invoices)
     .innerJoin(clients, eq(clients.id, invoices.clientId));
@@ -189,6 +191,7 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
       related,
       receipts: quoteId ? await receiptsFor(db, quoteId) : [],
       finalInvoice: inv.kind === "quote" ? await finalInvoiceFor(db, inv.id) : null,
+      counterOffers: inv.kind === "quote" ? await counterOffersFor(db, inv.id) : [],
       client,
       project: project ?? null,
       seller: { ...seller, name: org!.name, razorpayConnected: Boolean(settings.razorpayKeyId && razorpayKeySecretEnc) },
@@ -477,6 +480,33 @@ export const financeDocumentRoutes = new Hono<AppEnv>()
         { document: { id: draft!.id }, number, emailed, emailError: mail && !mail.sent ? MAIL_REASON[mail.reason] + (mail.error ? `: ${mail.error}` : "") : null },
         201,
       );
+    },
+  )
+
+  /* A client's proposed price for a quote, from the portal. */
+  .post(
+    "/finance/documents/:id/counter-offers/:offerId/approve",
+    requirePermission("invoice", "create"),
+    requirePermission("invoice", "send"),
+    async (c) => {
+      const quote = await loadDoc(c, c.req.param("id"));
+      if (quote.kind !== "quote") notFound("Counter-offer not found");
+      const revised = await approveCounterOffer(c.get("deps"), quote, c.req.param("offerId"), c.get("viewer")!.userId);
+      await audit(c, "quote.counter_approved", { type: "quote", id: quote.id }, { revised: revised.number, total: revised.total });
+      return c.json({ document: { id: revised.id }, number: revised.number });
+    },
+  )
+
+  .post(
+    "/finance/documents/:id/counter-offers/:offerId/reject",
+    requirePermission("invoice", "update"),
+    validate("json", z.object({ reason: z.string().trim().max(1000).nullish() })),
+    async (c) => {
+      const quote = await loadDoc(c, c.req.param("id"));
+      if (quote.kind !== "quote") notFound("Counter-offer not found");
+      await rejectCounterOffer(c.get("deps"), quote, c.req.param("offerId"), c.get("viewer")!.userId, c.req.valid("json").reason || null);
+      await audit(c, "quote.counter_rejected", { type: "quote", id: quote.id });
+      return c.json({ ok: true });
     },
   )
 

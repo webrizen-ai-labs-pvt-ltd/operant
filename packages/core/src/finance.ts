@@ -280,3 +280,26 @@ export function emiSchedule(opts: { principal: number; annualRatePct: number; co
   }
   return { emi: Math.round(emi), rows, totalInterest: rows.reduce((a, r) => a + r.interest, 0) };
 }
+
+/**
+ * Reprice lines so the document totals exactly `target` (a price agreed with the client,
+ * including GST): every unit price is scaled by the same factor, and the few paise that
+ * rounding leaves over are settled on the last line sold as a single unit.
+ */
+export function scaleLinesToTotal<L extends LineInput>(lines: L[], supply: SupplyType, opts: { roundOff?: boolean }, target: number): L[] {
+  const current = computeTotals(lines, supply, opts).total;
+  if (current <= 0 || target <= 0) return lines;
+  const out = lines.map((l) => ({ ...l, unitPrice: Math.max(0, Math.round((l.unitPrice * target) / current)) }));
+  let i = out.length - 1;
+  while (i >= 0 && Number(out[i]!.quantity) !== 1) i--;
+  if (i < 0) return out;
+  for (let pass = 0; pass < 6; pass++) {
+    const diff = target - computeTotals(out, supply, opts).total;
+    if (diff === 0) break;
+    const l = out[i]!;
+    const perPaisa = (1 - (l.discountPct ?? 0) / 100) * (1 + (supply === "export" ? 0 : l.taxRate / 100));
+    const step = Math.round(diff / perPaisa) || Math.sign(diff);
+    out[i] = { ...l, unitPrice: Math.max(0, l.unitPrice + step) };
+  }
+  return out;
+}

@@ -190,3 +190,36 @@ export const clientDocuments = pgTable(
   },
   (t) => [index("client_documents_request_idx").on(t.requestId), index("client_documents_project_idx").on(t.projectId)],
 ).enableRLS();
+
+export const COUNTER_OFFER_STATUSES = ["pending", "approved", "rejected", "withdrawn"] as const;
+
+/**
+ * A client's proposed price for a quote (the total, including GST), made from the portal.
+ * The team approves it, which issues a revised quote at that price in place of the old one,
+ * or rejects it with a reason. One pending proposal per quote.
+ */
+export const quoteCounterOffers = pgTable(
+  "quote_counter_offers",
+  {
+    id: id(),
+    orgId: orgId(),
+    quoteId: uuid("quote_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    portalUserId: uuid("portal_user_id").references(() => portalUsers.id, { onDelete: "set null" }),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    note: text("note"),
+    status: text("status", { enum: COUNTER_OFFER_STATUSES }).notNull().default("pending"),
+    /** The team's reply when rejecting. */
+    response: text("response"),
+    /** The revised quote issued on approval. */
+    revisedQuoteId: uuid("revised_quote_id").references(() => invoices.id, { onDelete: "set null" }),
+    decidedBy: text("decided_by"),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("quote_counter_offers_quote_idx").on(t.quoteId, t.createdAt),
+    uniqueIndex("quote_counter_offers_pending_key").on(t.quoteId).where(sql`${t.status} = 'pending'`),
+  ],
+).enableRLS();

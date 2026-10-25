@@ -2,6 +2,7 @@ import { INDIAN_STATES, isValidGstin, stateOfGstin } from "@operant/core";
 import { Badge, Button, Dialog, DialogContent, Field, Input, Select, Skeleton, Textarea } from "@operant/ui";
 import { ExternalLink, ReceiptText } from "lucide-react";
 import { useState } from "react";
+import { QuoteAnswer } from "../components/quote-answer.tsx";
 import { PageTitle, Section, SignedIn, useSlug } from "../components/shell.tsx";
 import { api, longDate, type Me, money, useAction, useBilling, useMe } from "../lib/api.ts";
 
@@ -122,7 +123,9 @@ export function BillingPage() {
                           </Badge>
                         ) : d.kind === "quote" ? (
                           <Badge tone={d.status === "accepted" || d.status === "partially_paid" ? "people" : d.status === "declined" ? "danger" : "brand"} pill>
-                            {{ sent: "Waiting for you", accepted: "Accepted", partially_paid: "Part paid", declined: "Declined", void: "Cancelled" }[d.status] ?? d.status}
+                            {d.status === "void" && d.counterOffer?.status === "approved"
+                              ? "Replaced at your price"
+                              : ({ sent: "Waiting for you", accepted: "Accepted", partially_paid: "Part paid", declined: "Declined", void: "Cancelled" }[d.status] ?? d.status)}
                           </Badge>
                         ) : null}
                       </div>
@@ -137,6 +140,11 @@ export function BillingPage() {
                         {unpaid ? "View and pay" : "View"} <ExternalLink />
                       </a>
                     </Button>
+                    {d.kind === "quote" && (d.status === "sent" || d.counterOffer?.status === "pending" || d.counterOffer?.status === "rejected") ? (
+                      <div className="basis-full">
+                        <QuoteAnswer slug={slug} quote={d} compact />
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}

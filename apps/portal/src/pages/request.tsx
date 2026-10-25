@@ -1,11 +1,10 @@
 import { Avatar, Badge, Button, cn, Skeleton } from "@operant/ui";
 import { Link, useParams } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check, ExternalLink } from "lucide-react";
-import { useState } from "react";
 import { Checklist, Conversation } from "../components/conversation.tsx";
 import { PageTitle, Section, SignedIn, useSlug } from "../components/shell.tsx";
-import { api, ApiError, longDate, money, type RequestDetail, STATUS, useAction, useRequest } from "../lib/api.ts";
-import { BillingDialog } from "./billing.tsx";
+import { QuoteAnswer } from "../components/quote-answer.tsx";
+import { api, longDate, money, type RequestDetail, STATUS, useAction, useRequest } from "../lib/api.ts";
 
 const STEPS = ["Requested", "Discussing", "Quote", "Work starts"] as const;
 const stepOf = (s: RequestDetail["request"]["status"]) => ({ new: 0, in_discussion: 1, quoted: 2, accepted: 3, started: 3, declined: 1, withdrawn: 0 })[s];
@@ -22,17 +21,6 @@ function RequestView() {
   const slug = useSlug();
   const { id } = useParams({ strict: false }) as { id: string };
   const { data, error } = useRequest(slug, id);
-  const [billing, setBilling] = useState(false);
-
-  const decide = useAction((d: "accept" | "decline") => api(`portal/orgs/${slug}/requests/${id}/quote/${d}`, { method: "POST" }), {
-    success: "Thanks, we've let the team know",
-    onError: (e) => {
-      if (e instanceof ApiError && e.code === "billing_required") {
-        setBilling(true);
-        return true;
-      }
-    },
-  });
   const withdraw = useAction(() => api(`portal/orgs/${slug}/requests/${id}/withdraw`, { method: "POST" }), { success: "Request withdrawn" });
 
   if (error) return <p className="text-sm text-tertiary">{error.message}</p>;
@@ -102,14 +90,9 @@ function RequestView() {
                   </a>
                 </Button>
               </div>
-              {r.quote.status === "sent" ? (
-                <div className="mt-5 flex flex-wrap gap-2 border-t border-secondary pt-5">
-                  <Button variant="primary" disabled={decide.isPending} onClick={() => decide.mutate("accept")}>
-                    <Check /> Accept quote
-                  </Button>
-                  <Button variant="ghost" disabled={decide.isPending} onClick={() => confirm("Decline this quote? You can keep talking to the team about it.") && decide.mutate("decline")}>
-                    Decline
-                  </Button>
+              {r.quote.status === "sent" || r.quote.counterOffer ? (
+                <div className="mt-5 border-t border-secondary pt-5">
+                  <QuoteAnswer slug={slug} quote={r.quote} />
                 </div>
               ) : null}
             </Section>
@@ -160,16 +143,6 @@ function RequestView() {
           </Section>
         </div>
       </div>
-      {billing ? (
-        <BillingDialog
-          open
-          onOpenChange={setBilling}
-          onDone={() => {
-            setBilling(false);
-            decide.mutate("accept");
-          }}
-        />
-      ) : null}
     </div>
   );
 }

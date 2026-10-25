@@ -1,4 +1,4 @@
-import { INDIAN_STATES, isValidGstin, stateOfGstin, uuidv7 } from "@operant/core";
+import { formatMoney, INDIAN_STATES, isValidGstin, stateOfGstin, uuidv7 } from "@operant/core";
 import {
   attachments,
   clientContacts,
@@ -17,6 +17,7 @@ import {
   portalUsers,
   projectMembers,
   projects,
+  quoteCounterOffers,
   serviceRequests,
   services,
   tasks,
@@ -30,6 +31,7 @@ import { z } from "zod";
 import type { AppEnv, PortalViewer } from "../context.ts";
 import { deliver, renderEmail } from "../finance/email.ts";
 import { effectiveDueDate } from "../finance/installments.ts";
+import { latestCounterOffers } from "../finance/counter-offers.ts";
 import { linkToken } from "../finance/service.ts";
 import { MAX_UPLOAD_BYTES } from "../routes/files.ts";
 import { nextSequence } from "../helpers.ts";
@@ -108,6 +110,17 @@ async function loadProject(c: Context<AppEnv>, id: string) {
   return p;
 }
 
+/** An existing client whose email, or one of whose contacts' emails, is this one. */
+async function clientByEmail(db: AppEnv["Variables"]["deps"]["db"], orgId: string, email: string) {
+  const [row] = await db
+    .select({ id: clients.id })
+    .from(clients)
+    .leftJoin(clientContacts, eq(clientContacts.clientId, clients.id))
+    .where(and(eq(clients.orgId, orgId), isNull(clients.archivedAt), or(sql`lower(${clients.email}) = ${email}`, sql`lower(${clientContacts.email}) = ${email}`)))
+    .limit(1);
+  return row?.id;
+}
+
 /**
  * The client (company) this person acts for. Linked by email to an existing client when
  * there is one; otherwise a new client with just a name. Billing details come later.
@@ -117,13 +130,7 @@ async function ensureClient(c: Context<AppEnv>, companyName?: string | null) {
   if (u.clientId) return u.clientId;
   const { db } = c.get("deps");
   const orgId = c.get("org").id;
-  const [byEmail] = await db
-    .select({ id: clients.id })
-    .from(clients)
-    .leftJoin(clientContacts, eq(clientContacts.clientId, clients.id))
-    .where(and(eq(clients.orgId, orgId), isNull(clients.archivedAt), or(sql`lower(${clients.email}) = ${u.email}`, sql`lower(${clientContacts.email}) = ${u.email}`)))
-    .limit(1);
-  let clientId = byEmail?.id;
+  let clientId = await clientByEmail(db, orgId, u.email);
   if (!clientId) {
     const [cur] = await db.select({ currency: orgSettings.currency }).from(orgSettings).where(eq(orgSettings.orgId, orgId));
     const base = (companyName?.trim() || u.name?.trim() || u.email).slice(0, 150);
@@ -143,6 +150,59 @@ async function ensureClient(c: Context<AppEnv>, companyName?: string | null) {
   await db.update(portalUsers).set({ clientId }).where(eq(portalUsers.id, u.id));
   c.set("portalUser", { ...u, clientId });
   return clientId;
+}
+
+/** A quote issued to this person's company. */
+async function loadQuote(c: Context<AppEnv>, id: string) {
+  const u = c.get("portalUser");
+  if (!u.clientId || !z.uuid().safeParse(id).success) throw new HTTPException(404, { message: "Quote not found" });
+  const [q] = await c
+    .get("deps")
+    .db.select()
+    .from(invoices)
+    .where(and(eq(invoices.orgId, c.get("org").id), eq(invoices.id, id), eq(invoices.clientId, u.clientId), eq(invoices.kind, "quote"), ne(invoices.status, "draft")));
+  if (!q) throw new HTTPException(404, { message: "Quote not found" });
+  return q;
+}
+
+/** Who on the team hears about a client's answer to a quote: the request's handler, else whoever made it. */
+async function quoteWatchers(c: Context<AppEnv>, quote: typeof invoices.$inferSelect) {
+  const { db } = c.get("deps");
+  const [request] = await db.select().from(serviceRequests).where(eq(serviceRequests.quoteId, quote.id));
+  const maker = quote.createdBy && !["system", "razorpay"].includes(quote.createdBy) ? quote.createdBy : null;
+  return { request: request ?? null, recipients: await staffRecipients(db, quote.orgId, [request?.assigneeUserId, maker]) };
+}
+
+/** Accept or decline a quote. Accepting needs billing details, so the invoice can be made out. */
+async function respondToQuote(c: Context<AppEnv>, quote: typeof invoices.$inferSelect, decision: "accept" | "decline") {
+  const deps = c.get("deps");
+  const { db } = deps;
+  if (quote.status !== "sent") throw new HTTPException(409, { message: "There's no quote waiting for an answer" });
+  if (decision === "accept") {
+    const [client] = await db.select().from(clients).where(eq(clients.id, quote.clientId));
+    if (!billingComplete(client)) throw new HTTPException(409, { res: Response.json({ error: "Add your billing details first", code: "billing_required" }, { status: 409 }) });
+  }
+  await db.update(invoices).set({ status: decision === "accept" ? "accepted" : "declined" }).where(eq(invoices.id, quote.id));
+  // Answering the quote as it stands settles any price still being discussed.
+  await db.update(quoteCounterOffers).set({ status: "withdrawn", decidedAt: new Date() }).where(and(eq(quoteCounterOffers.quoteId, quote.id), eq(quoteCounterOffers.status, "pending")));
+  const { request, recipients } = await quoteWatchers(c, quote);
+  const who = c.get("portalUser").name ?? c.get("portalUser").email;
+  if (request) {
+    await db.update(serviceRequests).set({ status: decision === "accept" ? "accepted" : "in_discussion" }).where(eq(serviceRequests.id, request.id));
+    await db.insert(portalMessages).values({ orgId: quote.orgId, requestId: request.id, authorKind: "system", body: `${who} ${decision === "accept" ? "accepted" : "declined"} quote ${quote.number}.` });
+  }
+  await notifyStaff(
+    deps,
+    quote.orgId,
+    recipients,
+    {
+      type: "portal.quote",
+      title: `Quote ${quote.number} ${decision === "accept" ? "accepted" : "declined"}`,
+      body: request ? `${REQUEST_LABEL(request.number)}: ${request.title}` : `By ${who}`,
+      link: request ? `/work/requests/${request.id}` : `/finance/invoices/${quote.id}`,
+    },
+    { email: decision === "accept" },
+  );
 }
 
 /** Billing details are complete enough to invoice. */
@@ -297,9 +357,12 @@ export const portalClientRoutes = new Hono<AppEnv>()
     if (!used) throw wrong();
 
     await db.insert(portalUsers).values({ orgId: org.id, email: input.email }).onConflictDoNothing();
+    const [existing] = await db.select({ clientId: portalUsers.clientId }).from(portalUsers).where(and(eq(portalUsers.orgId, org.id), sql`lower(${portalUsers.email}) = ${input.email}`));
+    // Someone the team already bills (by their verified email) sees their quotes and invoices straight away.
+    const linked = existing?.clientId ? undefined : await clientByEmail(db, org.id, input.email);
     const [user] = await db
       .update(portalUsers)
-      .set({ lastSignInAt: new Date() })
+      .set({ lastSignInAt: new Date(), ...(linked ? { clientId: linked } : {}) })
       .where(and(eq(portalUsers.orgId, org.id), sql`lower(${portalUsers.email}) = ${input.email}`))
       .returning();
     const token = randomToken();
@@ -552,7 +615,16 @@ export const portalClientRoutes = new Hono<AppEnv>()
         handler: r.assigneeUserId ? (staff.get(r.assigneeUserId) ?? null) : null,
         quote:
           quote && quote.status !== "draft" && quote.status !== "void"
-            ? { id: quote.id, number: quote.number, status: quote.status, total: quote.total, currency: quote.currency, validUntil: quote.dueDate, url: `${c.get("deps").appUrl.replace(/\/$/, "")}/i/${await linkToken(c.get("deps"), quote.id)}` }
+            ? {
+                id: quote.id,
+                number: quote.number,
+                status: quote.status,
+                total: quote.total,
+                currency: quote.currency,
+                validUntil: quote.dueDate,
+                url: `${c.get("deps").appUrl.replace(/\/$/, "")}/i/${await linkToken(c.get("deps"), quote.id)}`,
+                counterOffer: (await latestCounterOffers(db, [quote.id])).get(quote.id) ?? null,
+              }
             : null,
         project: project ?? null,
       },
@@ -593,22 +665,61 @@ export const portalClientRoutes = new Hono<AppEnv>()
     if (decision !== "accept" && decision !== "decline") throw new HTTPException(404, { message: "Not found" });
     const r = await loadRequest(c, c.req.param("id"));
     const [quote] = r.quoteId ? await db.select().from(invoices).where(eq(invoices.id, r.quoteId)) : [];
-    if (!quote || quote.status !== "sent") throw new HTTPException(409, { message: "There's no quote waiting for an answer" });
-    if (decision === "accept") {
-      const [client] = await db.select().from(clients).where(eq(clients.id, quote.clientId));
-      if (!billingComplete(client)) throw new HTTPException(409, { res: Response.json({ error: "Add your billing details first", code: "billing_required" }, { status: 409 }) });
-    }
-    await db.update(invoices).set({ status: decision === "accept" ? "accepted" : "declined" }).where(eq(invoices.id, quote.id));
-    await db.update(serviceRequests).set({ status: decision === "accept" ? "accepted" : "in_discussion" }).where(eq(serviceRequests.id, r.id));
-    const who = c.get("portalUser").name ?? c.get("portalUser").email;
-    await db.insert(portalMessages).values({ orgId: r.orgId, requestId: r.id, authorKind: "system", body: `${who} ${decision === "accept" ? "accepted" : "declined"} quote ${quote.number}.` });
-    await notifyStaff(
-      deps,
-      r.orgId,
-      await staffRecipients(db, r.orgId, [r.assigneeUserId]),
-      { type: "portal.quote", title: `Quote ${quote.number} ${decision === "accept" ? "accepted" : "declined"}`, body: `${REQUEST_LABEL(r.number)}: ${r.title}`, link: `/work/requests/${r.id}` },
-      { email: decision === "accept" },
-    );
+    if (!quote) throw new HTTPException(409, { message: "There's no quote waiting for an answer" });
+    await respondToQuote(c, quote, decision);
+    return c.json({ ok: true });
+  })
+
+  /* ---------------- Quotes ---------------- */
+
+  /** Propose a different price for a quote (the total, including GST). The team approves or rejects it. */
+  .post(
+    "/portal/orgs/:slug/quotes/:id/counter",
+    portalOrg,
+    requireClient,
+    validate("json", z.object({ amount: z.number().int().positive().max(1e13), note: z.string().trim().max(1000).nullish() })),
+    async (c) => {
+      const deps = c.get("deps");
+      const { db } = deps;
+      const input = c.req.valid("json");
+      const quote = await loadQuote(c, c.req.param("id"));
+      if (quote.status !== "sent") throw new HTTPException(409, { message: "You can only propose a price for a quote that's waiting for your answer" });
+      if (input.amount === quote.total) throw new HTTPException(422, { message: "That's the quote's price already. Accept the quote instead." });
+      const [offer] = await db
+        .insert(quoteCounterOffers)
+        .values({ orgId: quote.orgId, quoteId: quote.id, portalUserId: c.get("portalUser").id, amount: input.amount, note: input.note || null })
+        .onConflictDoNothing()
+        .returning({ id: quoteCounterOffers.id });
+      if (!offer) throw new HTTPException(409, { message: "You've already proposed a price for this quote. The team will get back to you." });
+      const { request, recipients } = await quoteWatchers(c, quote);
+      const who = c.get("portalUser").name ?? c.get("portalUser").email;
+      if (request) {
+        await db.insert(portalMessages).values({
+          orgId: quote.orgId,
+          requestId: request.id,
+          authorKind: "system",
+          body: `${who} proposed ${formatMoney(input.amount, quote.currency)} for quote ${quote.number}${input.note ? `: "${input.note}"` : "."}`,
+        });
+      }
+      await notifyStaff(
+        deps,
+        quote.orgId,
+        recipients,
+        {
+          type: "portal.counter_offer",
+          title: `${who} proposed ${formatMoney(input.amount, quote.currency)} for quote ${quote.number}`,
+          body: `Quoted ${formatMoney(quote.total, quote.currency)}${input.note ? ` · ${input.note.slice(0, 120)}` : ""}`,
+          link: `/finance/invoices/${quote.id}`,
+        },
+        { email: true },
+      );
+      return c.json({ counterOffer: offer }, 201);
+    },
+  )
+
+  .post("/portal/orgs/:slug/quotes/:id/:decision{accept|decline}", portalOrg, requireClient, async (c) => {
+    const quote = await loadQuote(c, c.req.param("id"));
+    await respondToQuote(c, quote, c.req.param("decision") as "accept" | "decline");
     return c.json({ ok: true });
   })
 
@@ -771,5 +882,6 @@ export const portalClientRoutes = new Hono<AppEnv>()
       .orderBy(desc(invoices.issueDate), desc(invoices.createdAt))
       .limit(200);
     const base = deps.appUrl.replace(/\/$/, "");
-    return c.json({ documents: await Promise.all(rows.map(async (r) => ({ ...r, url: `${base}/i/${await linkToken(deps, r.id)}` }))) });
+    const offers = await latestCounterOffers(deps.db, rows.filter((r) => r.kind === "quote").map((r) => r.id));
+    return c.json({ documents: await Promise.all(rows.map(async (r) => ({ ...r, url: `${base}/i/${await linkToken(deps, r.id)}`, counterOffer: offers.get(r.id) ?? null }))) });
   });

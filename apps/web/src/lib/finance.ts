@@ -36,6 +36,8 @@ export interface DocRow {
   amountPaid: number;
   recurringId: string | null;
   sentAt: string | null;
+  /** A quote with a client's proposed price waiting for an answer. */
+  counterPending?: boolean;
 }
 
 export interface Doc extends Omit<DocRow, "clientName"> {
@@ -121,6 +123,19 @@ export interface Receipt {
   voidedAt?: string | null;
 }
 
+export interface CounterOfferRow {
+  id: string;
+  amount: number;
+  note: string | null;
+  status: "pending" | "approved" | "rejected" | "withdrawn";
+  response: string | null;
+  revisedQuoteId: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+  byName: string | null;
+  byEmail: string | null;
+}
+
 export interface DocDetail {
   document: Doc;
   lines: Line[];
@@ -130,6 +145,8 @@ export interface DocDetail {
   receipts: Receipt[];
   /** On a quote: the final invoice generated from it. */
   finalInvoice: { id: string; number: string | null } | null;
+  /** On a quote: prices the client proposed from the portal, newest first. */
+  counterOffers: CounterOfferRow[];
   client: ClientInfo & { id: string };
   project: { id: string; name: string } | null;
   seller: Seller & { razorpayConnected: boolean };

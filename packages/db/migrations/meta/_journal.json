@@ -64,6 +64,13 @@
       "when": 1792909625706,
       "tag": "0008_quote_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792911037398,
+      "tag": "0009_quote_counter_offers",
+      "breakpoints": true
     }
   ]
 }

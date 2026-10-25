@@ -9,6 +9,7 @@ import {
   formatMoney,
   isValidGstin,
   receiptTax,
+  scaleLinesToTotal,
   supplyTypeFor,
 } from "./finance.ts";
 
@@ -136,5 +137,21 @@ describe("receipt tax", () => {
 
   it("has no tax when the quote has none", () => {
     expect(receiptTax({ total: 500_000, cgst: 0, sgst: 0, igst: 0 }, 0, 100_000)).toEqual({ taxable: 100_000, cgst: 0, sgst: 0, igst: 0 });
+  });
+});
+
+describe("repricing to an agreed total", () => {
+  it("hits the agreed total exactly, keeping the lines' proportions", () => {
+    const lines = [
+      { quantity: 3, unitPrice: 250_000, taxRate: 18 },
+      { quantity: 1, unitPrice: 1_000_000, taxRate: 5, discountPct: 10 },
+    ];
+    for (const roundOff of [true, false]) {
+      const out = scaleLinesToTotal(lines, "intra", { roundOff }, 1_500_000);
+      expect(computeTotals(out, "intra", { roundOff }).total).toBe(1_500_000);
+      expect(out[0]!.unitPrice).toBeLessThan(250_000);
+    }
+    const inter = scaleLinesToTotal(lines, "inter", {}, 1_234_500);
+    expect(computeTotals(inter, "inter", {}).total).toBe(1_234_500);
   });
 });

@@ -184,3 +184,72 @@ describe("requests", () => {
     expect(docs.json.documents).toEqual([expect.objectContaining({ kind: "quote", status: "accepted", url: expect.stringMatching(/\/i\//) })]);
   });
 });
+
+describe("answering quotes from the portal", () => {
+  let clientId = "";
+  const quote = async (rupees: number) => {
+    const q = await t.call<{ document: { id: string } }>("fia", "/finance/documents", { kind: "quote", clientId, issueDate: "2026-10-20", lines: [{ description: "Annual audit", quantity: 1, unitPrice: rupees * 100, taxRate: 18 }] });
+    await t.call("fia", `/finance/documents/${q.json.document.id}/issue`, { email: false });
+    return q.json.document.id;
+  };
+  type Offer = { id: string; amount: number; status: string };
+  const staffView = async (id: string) =>
+    (await t.call<{ document: { status: string; number: string; total: number }; counterOffers: Offer[] }>("fia", `/finance/documents/${id}`)).json;
+  const billing = async () => (await priya.call<{ documents: { id: string; number: string; status: string; total: number; counterOffer: Offer | null }[] }>("/portal/orgs/acme/invoices")).json.documents;
+
+  beforeAll(async () => {
+    clientId = (await t.call<{ client: { id: string } }>("fia", `/service-requests/${requestId}`)).json.client.id;
+  });
+
+  it("proposes a new price, which the team can reject", async () => {
+    const q = await quote(5000);
+    const sent = await priya.call(`/portal/orgs/acme/quotes/${q}/counter`, { amount: 400_000, note: "Our budget is ₹4,000" });
+    expect(sent.status).toBe(201);
+    expect((await priya.call(`/portal/orgs/acme/quotes/${q}/counter`, { amount: 450_000 })).status).toBe(409);
+    expect((await staffView(q)).counterOffers).toEqual([expect.objectContaining({ amount: 400_000, status: "pending" })]);
+    const list = await t.call<{ documents: { id: string; counterPending: boolean }[] }>("fia", "/finance/documents?kind=quote");
+    expect(list.json.documents.find((d) => d.id === q)!.counterPending).toBe(true);
+
+    expect((await t.call("mo", `/finance/documents/${q}/counter-offers/${(await staffView(q)).counterOffers[0]!.id}/reject`, {})).status).toBe(403);
+    expect((await t.call("fia", `/finance/documents/${q}/counter-offers/${(await staffView(q)).counterOffers[0]!.id}/reject`, { reason: "That's below cost." })).status).toBe(200);
+    expect((await billing()).find((d) => d.id === q)).toMatchObject({ status: "sent", counterOffer: { status: "rejected", amount: 400_000 } });
+  });
+
+  it("issues a revised, accepted quote at the client's price when the team approves", async () => {
+    const q = (await billing()).find((d) => d.status === "sent")!.id;
+    await priya.call(`/portal/orgs/acme/quotes/${q}/counter`, { amount: 450_000 });
+    const offer = (await staffView(q)).counterOffers[0]!;
+    const approved = await t.call<{ document: { id: string }; number: string }>("fia", `/finance/documents/${q}/counter-offers/${offer.id}/approve`, {});
+    expect(approved.status).toBe(200);
+    const revised = await staffView(approved.json.document.id);
+    expect(revised.document).toMatchObject({ status: "accepted", total: 450_000, number: approved.json.number });
+    expect((await staffView(q)).document.status).toBe("void");
+    expect((await t.call("fia", `/finance/documents/${q}/counter-offers/${offer.id}/approve`, {})).status).toBe(409);
+    expect((await billing()).find((d) => d.id === approved.json.document.id)).toMatchObject({ status: "accepted" });
+  });
+
+  it("accepts or declines any quote, once", async () => {
+    const a = await quote(1000);
+    const b = await quote(2000);
+    expect((await priya.call(`/portal/orgs/acme/quotes/${a}/accept`, {})).status).toBe(200);
+    expect((await priya.call(`/portal/orgs/acme/quotes/${b}/decline`, {})).status).toBe(200);
+    expect((await priya.call(`/portal/orgs/acme/quotes/${b}/accept`, {})).status).toBe(409);
+    expect((await priya.call(`/portal/orgs/acme/quotes/${a}/counter`, { amount: 500 })).status).toBe(409);
+    const docs = await billing();
+    expect(docs.find((d) => d.id === a)!.status).toBe("accepted");
+    expect(docs.find((d) => d.id === b)!.status).toBe("declined");
+    expect((await browser().call(`/portal/orgs/acme/quotes/${a}/accept`, {})).status).toBe(401);
+  });
+});
+
+describe("clients the team already bills", () => {
+  it("see their quotes as soon as they sign in with the client's email", async () => {
+    const cl = await t.call<{ client: { id: string } }>("fia", "/clients", { name: "Mehta Exports", email: "accounts@mehta.test" });
+    const q = await t.call<{ document: { id: string } }>("fia", "/finance/documents", { kind: "quote", clientId: cl.json.client.id, issueDate: "2026-10-20", lines: [{ description: "Bookkeeping", quantity: 1, unitPrice: 300_000, taxRate: 18 }] });
+    await t.call("fia", `/finance/documents/${q.json.document.id}/issue`, { email: false });
+    const mehta = browser();
+    await signIn(mehta, "accounts@mehta.test");
+    const docs = await mehta.call<{ documents: { id: string; status: string }[] }>("/portal/orgs/acme/invoices");
+    expect(docs.json.documents).toEqual([expect.objectContaining({ id: q.json.document.id, status: "sent" })]);
+  });
+});
