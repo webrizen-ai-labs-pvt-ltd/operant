@@ -1,7 +1,10 @@
 import { type Db, holidays, labels, leaveTypes, type OnboardingTemplateItem, onboardingTemplates } from "@operant/db";
+import { ensureOrgRoles } from "./roles.ts";
 
 /** Starting data for a brand-new organization. Everything is editable afterwards. */
 export async function seedOrgDefaults(db: Db, orgId: string, now = new Date()) {
+  await ensureOrgRoles(db, orgId);
+
   await db.insert(leaveTypes).values([
     { orgId, name: "Casual leave", color: "#2e8b6e", annualQuota: 12, paid: true },
     { orgId, name: "Sick leave", color: "#4c6e9e", annualQuota: 8, paid: true },

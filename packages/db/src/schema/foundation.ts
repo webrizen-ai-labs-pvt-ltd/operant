@@ -75,8 +75,12 @@ export const members = pgTable(
     email: text("email").notNull(),
     name: text("name").notNull(),
     image: text("image"),
+    /** The identity provider's organization role when it's owner or admin (they can do everything). */
     roles: text("roles").array().notNull().default(sql`'{}'::text[]`),
-    status: text("status", { enum: ["active", "removed"] }).notNull().default("active"),
+    /** Their Operant role; null means the organization's default role. Ignored for owners and admins. */
+    roleId: uuid("role_id").references(() => roles.id, { onDelete: "set null" }),
+    /** removed: gone from the organization. blocked: still in it, but turned off in Operant (offboarding). */
+    status: text("status", { enum: ["active", "removed", "blocked"] }).notNull().default("active"),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -163,7 +167,7 @@ export const webhookReceipts = pgTable("webhook_receipts", {
   receivedAt: createdAt(),
 }).enableRLS();
 
-/* ---------- Offline edition only: local accounts and roles ---------- */
+/* ---------- Offline edition only: local accounts ---------- */
 
 export const localUsers = pgTable(
   "local_users",
@@ -195,6 +199,7 @@ export const localSessions = pgTable(
   (t) => [index("local_sessions_user_idx").on(t.userId)],
 ).enableRLS();
 
+/** Each organization's own roles: a name and what it can do. Owners and admins don't need one. */
 export const roles = pgTable(
   "roles",
   {
@@ -204,8 +209,12 @@ export const roles = pgTable(
       .references(() => orgs.id, { onDelete: "cascade" }),
     key: text("key").notNull(),
     name: text("name").notNull(),
+    description: text("description"),
     permissions: jsonb("permissions").$type<Record<string, string[]>>().notNull().default({}),
     isSystem: boolean("is_system").notNull().default(false),
+    /** Given to people who join without a role. Exactly one per organization. */
+    isDefault: boolean("is_default").notNull().default(false),
+    position: integer("position").notNull().default(0),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

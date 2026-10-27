@@ -12,14 +12,14 @@ const viewers = {
 // A stand-in for Webrizen: records invitations, and answers like the real API for a few addresses.
 const sent: Parameters<DirectoryInviter["invite"]>[0][] = [];
 const directory: DirectoryInviter = {
-  async roles() {
-    return ["staff", "manager", "admin"];
-  },
   async invite(input) {
     sent.push(input);
     if (input.email === "taken@acme.test") return { ok: false, code: "already_member", message: "Already a member" };
-    if (input.role === "nonsense") return { ok: false, code: "invalid_role", message: "There's no role called nonsense in this organization" };
+    if (input.email === "down@acme.test") return { ok: false, code: "500", message: "Webrizen is down" };
     return { ok: true, expiresAt: new Date(Date.now() + 48 * 3600_000).toISOString() };
+  },
+  async removeFromOrganization() {
+    return { ok: true };
   },
 };
 
@@ -29,6 +29,8 @@ const add = async (fullName: string, workEmail?: string) =>
   (await t.call<{ employee: { id: string } }>("hana", "/employees", { fullName, ...(workEmail ? { workEmail } : {}) })).json.employee.id;
 type Row = { id: string; signIn: string; invitedAt: string | null };
 const row = async (id: string) => (await t.call<{ employee: Row }>("hana", `/employees/${id}`)).json.employee;
+type InviteRole = { id: string; name: string; isDefault: boolean };
+const inviteRoles = async () => (await t.call<{ roles: InviteRole[]; available: boolean }>("hana", "/employees/invite-roles")).json;
 
 beforeAll(async () => {
   t = await createTestApi(viewers, { directory });
@@ -38,20 +40,36 @@ beforeAll(async () => {
 afterAll(async () => t?.close());
 
 describe("inviting employees to sign in", () => {
-  it("sends the invitation through Webrizen on behalf of the person clicking", async () => {
+  it("offers the organization's own roles, default first, then Admin", async () => {
+    const r = await inviteRoles();
+    expect(r.available).toBe(true);
+    expect(r.roles[0]).toMatchObject({ name: "Staff", isDefault: true });
+    expect(r.roles.map((x) => x.name)).toEqual(expect.arrayContaining(["Manager", "Accounts", "HR"]));
+    expect(r.roles.at(-1)?.id).toBe("admin");
+  });
+
+  it("sends the invitation through Webrizen and remembers the Operant role", async () => {
+    const manager = (await inviteRoles()).roles.find((x) => x.name === "Manager")!;
     const id = await add("Ravi Kumar", "ravi@acme.test");
     expect((await row(id)).signIn).toBe("none");
-    const r = await t.call<{ expiresAt: string }>("hana", `/employees/${id}/invite`, { role: "member" });
+    const r = await t.call<{ expiresAt: string }>("hana", `/employees/${id}/invite`, { role: manager.id });
     expect(r.status).toBe(200);
-    expect(sent.at(-1)).toEqual({ email: "ravi@acme.test", name: "Ravi Kumar", role: "member", accessToken: "hana-token" });
+    // Webrizen only hears who to invite; the role stays in Operant.
+    expect(sent.at(-1)).toEqual({ email: "ravi@acme.test", name: "Ravi Kumar", admin: false, accessToken: "hana-token" });
     const after = await row(id);
     expect(after.signIn).toBe("invited");
     expect(after.invitedAt).toBeTruthy();
   });
 
-  it("needs a work email, and the right to add people", async () => {
+  it("invites as an organization admin when asked", async () => {
+    await t.call("hana", `/employees/${await add("Priya", "priya@acme.test")}/invite`, { role: "admin" });
+    expect(sent.at(-1)).toMatchObject({ email: "priya@acme.test", admin: true });
+  });
+
+  it("needs a work email, a real role, and the right to add people", async () => {
     expect((await t.call("hana", `/employees/${await add("No Email")}/invite`, {})).status).toBe(422);
     const id = await add("Asha", "asha@acme.test");
+    expect((await t.call("hana", `/employees/${id}/invite`, { role: "00000000-0000-7000-8000-000000000000" })).status).toBe(422);
     expect((await t.call("mo", `/employees/${id}/invite`, {})).status).toBe(403);
   });
 
@@ -74,13 +92,7 @@ describe("inviting employees to sign in", () => {
     const taken = await t.call<{ error: string }>("hana", `/employees/${await add("Taken", "taken@acme.test")}/invite`, {});
     expect(taken.status).toBe(409);
     expect(taken.json.error).toContain("can sign in now");
-    const bad = await t.call<{ error: string }>("hana", `/employees/${await add("Odd Role", "odd@acme.test")}/invite`, { role: "nonsense" });
-    expect(bad.status).toBe(422);
-  });
-
-  it("offers Webrizen's roles for Operant, default first, never owner", async () => {
-    const r = await t.call<{ roles: string[]; available: boolean }>("hana", "/employees/invite-roles");
-    expect(r.json.available).toBe(true);
-    expect(r.json.roles).toEqual(["staff", "manager", "admin"]);
+    const down = await t.call<{ error: string }>("hana", `/employees/${await add("Down", "down@acme.test")}/invite`, {});
+    expect(down.status).toBe(502);
   });
 });

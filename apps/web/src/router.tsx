@@ -31,6 +31,7 @@ import { AuditPage, OrgSettingsPage, PreferencesPage } from "./pages/settings.ts
 import { SignInPage } from "./pages/sign-in.tsx";
 import { HelpArticlePage, HelpPage } from "./pages/help/help.tsx";
 import { EmailSettingsPage } from "./pages/email-settings.tsx";
+import { RolesSettingsPage } from "./pages/roles-settings.tsx";
 
 export { useViewer };
 
@@ -178,6 +179,7 @@ const routeTree = rootRoute.addChildren([
     financePage("settings", () => <FinanceSettingsPage me={useViewer()} />),
   ]),
   page("/settings", () => <OrgSettingsPage me={useViewer()} />),
+  page("/settings/roles", () => <RolesSettingsPage me={useViewer()} />),
   page("/settings/email", () => <EmailSettingsPage me={useViewer()} />),
   page("/settings/audit", () => <AuditPage me={useViewer()} />),
   page("/settings/preferences", () => <PreferencesPage />),

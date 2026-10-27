@@ -13,24 +13,22 @@ describe("safeReturnTo", () => {
 });
 
 describe("claimsToIdentity", () => {
-  it("maps the Webrizen SSO org and roles claims to permissions", () => {
+  it("leaves members' permissions to their Operant role", () => {
     const id = claimsToIdentity({
       sub: "u1",
       email: "ravi@spiceroute.in",
       name: "Ravi Kumar",
       picture: null,
       org: { id: "o1", name: "Spice Route", slug: "spice-route", role: "member" },
-      roles: ["accounts", "unknown"],
     });
     expect(id.user).toEqual({ id: "u1", email: "ravi@spiceroute.in", name: "Ravi Kumar", image: null });
-    expect(id.org?.roles).toEqual(["accounts", "unknown"]);
-    expect(id.org?.permissions.invoice).toContain("send");
-    expect(id.org?.permissions.settings).toBeUndefined();
+    expect(id.org).toMatchObject({ roles: [], permissions: {}, useOrgRole: true });
   });
 
   it("gives organization owners and admins every permission", () => {
-    const id = claimsToIdentity({ sub: "u1", org: { id: "o1", name: "A", slug: "a", role: "admin" }, roles: [] });
+    const id = claimsToIdentity({ sub: "u1", org: { id: "o1", name: "A", slug: "a", role: "admin" } });
     expect(id.org?.roles).toEqual(["admin"]);
+    expect(id.org?.useOrgRole).toBe(false);
     expect(id.org?.permissions.settings).toEqual(["manage"]);
   });
 

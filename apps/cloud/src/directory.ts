@@ -4,31 +4,33 @@ import type { Env } from "./env.ts";
 
 /**
  * Webrizen SSO management API (/v1/org/*). It acts as the signed-in person, with their access
- * token, in the organization they signed in to. Reading works for every member; inviting needs
- * an organization owner or admin.
+ * token, in the organization they signed in to. Reading works for every member; inviting and
+ * removing people needs an organization owner or admin.
+ *
+ * Operant manages its own roles (Webrizen sends none for it), so this is only about who is in
+ * the organization.
  */
 
 const INVITE_TTL_DAYS = 7;
 
 const apiMember = z.object({
+  memberId: z.string(),
   userId: z.string(),
   email: z.string(),
   name: z.string().nullable().optional(),
   image: z.string().nullable().optional(),
   orgRole: z.string(),
-  roles: z.array(z.string()).default([]),
 });
 
 const membersPage = z.object({ members: z.array(apiMember), hasMore: z.boolean() });
-const rolesList = z.object({ roles: z.array(z.object({ key: z.string(), isDefault: z.boolean().optional() })) });
 
-/** Operant's member roles: the Webrizen org role when it's owner or admin, then Operant's own roles. */
-export function memberRoles(orgRole: string, appRoles: string[]) {
-  return orgRole === "owner" || orgRole === "admin" ? [orgRole, ...appRoles] : appRoles;
+/** Operant's member markers: the Webrizen organization role when it's owner or admin. */
+export function memberRoles(orgRole: string) {
+  return orgRole === "owner" || orgRole === "admin" ? [orgRole] : [];
 }
 
 export function toSnapshot(m: z.infer<typeof apiMember>): MemberSnapshot {
-  return { userId: m.userId, email: m.email, name: m.name || m.email, image: m.image ?? null, roles: memberRoles(m.orgRole, m.roles) };
+  return { userId: m.userId, email: m.email, name: m.name || m.email, image: m.image ?? null, roles: memberRoles(m.orgRole) };
 }
 
 class WebrizenApiError extends Error {
@@ -51,49 +53,53 @@ async function call(env: Env, accessToken: string, path: string, init?: RequestI
   return body;
 }
 
-/** Everyone in the person's organization who can use Operant. */
-export async function listAllMembers(env: Env, accessToken: string) {
-  const members: MemberSnapshot[] = [];
+async function listPages(env: Env, accessToken: string, q?: string) {
+  const members: z.infer<typeof apiMember>[] = [];
+  const search = q ? `&q=${encodeURIComponent(q)}` : "";
   for (let offset = 0; ; offset += 200) {
-    const page = membersPage.parse(await call(env, accessToken, `/v1/org/members?limit=200&offset=${offset}`));
-    members.push(...page.members.map(toSnapshot));
+    const page = membersPage.parse(await call(env, accessToken, `/v1/org/members?all=true&limit=200&offset=${offset}${search}`));
+    members.push(...page.members);
     if (!page.hasMore) break;
   }
   return members;
 }
 
-async function appRoles(env: Env, accessToken: string) {
-  return rolesList.parse(await call(env, accessToken, "/v1/org/roles")).roles;
+/** Everyone in the person's organization (all of them can open Operant). */
+export async function listAllMembers(env: Env, accessToken: string): Promise<MemberSnapshot[]> {
+  return (await listPages(env, accessToken)).map(toSnapshot);
 }
 
-/** Invitations through Webrizen: it emails the person a link to join the organization. */
+function failure(err: unknown) {
+  if (!(err instanceof WebrizenApiError)) throw err;
+  return { ok: false as const, code: err.status === 403 ? "not_allowed" : err.code, message: err.message };
+}
+
+/** Invitations and removals through Webrizen, as the signed-in person. */
 export function webrizenInviter(env: Env): DirectoryInviter {
   return {
-    async roles(accessToken) {
-      const roles = await appRoles(env, accessToken);
-      const sorted = [...roles.filter((r) => r.isDefault), ...roles.filter((r) => !r.isDefault)];
-      return [...sorted.map((r) => r.key), "admin"];
-    },
-
-    async invite({ email, name, role, accessToken }) {
+    async invite({ email, name, admin, accessToken }) {
       try {
-        // "admin" makes them an organization admin; Webrizen still wants one Operant role, so use the default.
-        const roles =
-          role === "admin" || role === "member"
-            ? [((await appRoles(env, accessToken)).find((r) => r.isDefault) ?? { key: "staff" }).key]
-            : [role];
         const result = await call(env, accessToken, "/v1/org/invitations", {
           method: "POST",
-          body: JSON.stringify({ email, name, roles, admin: role === "admin" }),
+          body: JSON.stringify({ email, name, roles: [], admin }),
         });
         if (result.kind === "member_updated") {
           return { ok: false, code: "already_member", message: "They're already in the organization." };
         }
         return { ok: true, expiresAt: new Date(Date.now() + INVITE_TTL_DAYS * 86_400_000).toISOString() };
       } catch (err) {
-        if (!(err instanceof WebrizenApiError)) throw err;
-        const code = err.status === 403 ? "not_allowed" : err.code === "unknown_role" ? "invalid_role" : err.code;
-        return { ok: false, code, message: err.message };
+        return failure(err);
+      }
+    },
+
+    async removeFromOrganization({ email, accessToken }) {
+      try {
+        const match = (await listPages(env, accessToken, email)).find((m) => m.email.toLowerCase() === email.toLowerCase());
+        if (!match) return { ok: true };
+        await call(env, accessToken, `/v1/org/members/${encodeURIComponent(match.memberId)}`, { method: "DELETE" });
+        return { ok: true };
+      } catch (err) {
+        return failure(err);
       }
     },
   };

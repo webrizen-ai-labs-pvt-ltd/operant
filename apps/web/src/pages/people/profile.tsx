@@ -1,4 +1,4 @@
-import { Avatar, Badge, Button, Card, cn, DateInput, Dialog, DialogContent, Field, Input, Skeleton } from "@operant/ui";
+import { Avatar, Badge, Button, Card, Checkbox, cn, DateInput, Dialog, DialogContent, Field, Input, Skeleton } from "@operant/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { can } from "@operant/core";
@@ -129,20 +129,31 @@ function Documents({ employeeId, canDelete }: { employeeId: string; canDelete: b
   );
 }
 
-function OffboardDialog({ open, onOpenChange, id, name }: { open: boolean; onOpenChange: (o: boolean) => void; id: string; name: string }) {
+function OffboardDialog({ open, onOpenChange, id, name, cloud }: { open: boolean; onOpenChange: (o: boolean) => void; id: string; name: string; cloud: boolean }) {
   const [exitDate, setExitDate] = useState(new Date().toISOString().slice(0, 10));
-  const offboard = useApiMutation(() => api(`employees/${id}/offboard`, { method: "POST", body: JSON.stringify({ exitDate }) }), {
-    invalidate: PEOPLE_KEYS,
-    success: `${name} was offboarded`,
-    onSuccess: () => onOpenChange(false),
-  });
+  const [removeFromOrganization, setRemoveFromOrganization] = useState(false);
+  const offboard = useApiMutation(
+    () =>
+      api<{ removal: { ok: boolean; message?: string } | null }>(`employees/${id}/offboard`, {
+        method: "POST",
+        body: JSON.stringify({ exitDate, removeFromOrganization }),
+      }),
+    {
+      invalidate: PEOPLE_KEYS,
+      success: `${name} was offboarded`,
+      onSuccess: (r) => {
+        if (r.removal && !r.removal.ok) toast.error(`They're offboarded, but weren't removed from the organization: ${r.removal.message}`);
+        onOpenChange(false);
+      },
+    },
+  );
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         title={`Offboard ${name}?`}
         icon={UserMinus}
         iconColor="error"
-        description="They'll move to former employees. Their direct reports move up to their manager."
+        description="They'll move to former employees and can't use Operant any more. Their direct reports move up to their manager."
         footer={
           <>
             <Button variant="ghost" onClick={() => onOpenChange(false)}>
@@ -154,9 +165,19 @@ function OffboardDialog({ open, onOpenChange, id, name }: { open: boolean; onOpe
           </>
         }
       >
-        <Field label="Last working day">
-          <DateInput value={exitDate} onChange={(v) => setExitDate(v)} />
-        </Field>
+        <div className="space-y-4">
+          <Field label="Last working day">
+            <DateInput value={exitDate} onChange={(v) => setExitDate(v)} />
+          </Field>
+          {cloud ? (
+            <Checkbox
+              isSelected={removeFromOrganization}
+              onChange={setRemoveFromOrganization}
+              label="Also remove them from the organization"
+              hint="They lose access to every Webrizen app your organization uses, not just Operant. Needs a Webrizen owner or admin."
+            />
+          ) : null}
+        </div>
       </DialogContent>
     </Dialog>
   );
@@ -375,7 +396,7 @@ export function ProfilePage() {
 
       {access.canEdit ? <EmployeeFormDialog key={e.id} open={editing} onOpenChange={setEditing} employee={e} /> : null}
       {inviting ? <InviteDialog employee={e} onClose={() => setInviting(false)} /> : null}
-      {access.canArchive ? <OffboardDialog open={offboarding} onOpenChange={setOffboarding} id={e.id} name={e.fullName} /> : null}
+      {access.canArchive ? <OffboardDialog open={offboarding} onOpenChange={setOffboarding} id={e.id} name={e.fullName} cloud={me.edition === "cloud"} /> : null}
     </PageBody>
   );
 }

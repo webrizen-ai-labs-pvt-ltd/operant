@@ -182,7 +182,7 @@ function AccountMenu({ me }: { me: Me }) {
           </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block truncate text-sm font-semibold text-secondary">{me.org.name}</span>
-            <span className="block truncate text-xs capitalize text-tertiary">{me.org.roles.join(", ") || "member"}</span>
+            <span className="block truncate text-xs capitalize text-tertiary">{me.org.roleName ?? (me.org.roles.join(", ") || "member")}</span>
           </span>
         </div>
         {me.edition === "cloud" ? (

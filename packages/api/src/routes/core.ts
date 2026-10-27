@@ -24,6 +24,8 @@ export const coreRoutes = new Hono<AppEnv>()
         slug: org.slug,
         logo: viewer.org?.logo ?? null,
         roles: viewer.org?.roles ?? [],
+        /** Their Operant role's name; null for owners and admins (they can do everything). */
+        roleName: viewer.org?.roleName ?? null,
         permissions: viewer.org?.permissions ?? {},
       },
       settings: {

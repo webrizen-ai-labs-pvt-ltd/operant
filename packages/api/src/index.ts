@@ -13,6 +13,7 @@ import { taskRoutes } from "./routes/work/tasks.ts";
 import { collabRoutes } from "./routes/collab.ts";
 import { eventRoutes } from "./routes/events.ts";
 import { homeRoutes } from "./routes/home.ts";
+import { roleRoutes } from "./routes/roles.ts";
 import { financeDocumentRoutes } from "./finance/document-routes.ts";
 import { installmentRoutes } from "./finance/installment-routes.ts";
 import { emailRoutes } from "./email/email-routes.ts";
@@ -46,7 +47,9 @@ const pillars = new Hono<AppEnv>()
   // Client portal (the team's side)
   .route("/", portalStaffRoutes)
   // Settings → Email
-  .route("/", emailRoutes);
+  .route("/", emailRoutes)
+  // Settings → Roles & access
+  .route("/", roleRoutes);
 
 export type { ActiveOrg, ApiDeps, AppEnv, DirectoryInviter } from "./context.ts";
 export { audit } from "./audit.ts";

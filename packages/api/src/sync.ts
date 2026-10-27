@@ -3,6 +3,10 @@ import { type Db, members, orgSettings, orgs } from "@operant/db";
 import { and, eq, sql } from "drizzle-orm";
 import type { ActiveOrg } from "./context.ts";
 import { seedOrgDefaults } from "./defaults.ts";
+import { invitedRoles } from "./roles.ts";
+
+/** Back to active, unless someone turned off their access in Operant (offboarding). */
+const keepBlocked = sql`case when ${members.status} = 'blocked' then 'blocked' else 'active' end`;
 
 /**
  * Make sure the viewer's org and membership exist locally, and refresh their
@@ -27,6 +31,8 @@ export async function syncViewer(db: Db, viewer: Viewer): Promise<ActiveOrg | nu
   const created = await db.insert(orgSettings).values({ orgId: org.id }).onConflictDoNothing().returning({ orgId: orgSettings.orgId });
   if (created.length > 0) await seedOrgDefaults(db, org.id);
 
+  // A role picked when they were invited from Operant applies the first time they show up.
+  const invitedRole = (await invitedRoles(db, org.id)).get(viewer.email.toLowerCase()) ?? null;
   await db
     .insert(members)
     .values({
@@ -36,6 +42,7 @@ export async function syncViewer(db: Db, viewer: Viewer): Promise<ActiveOrg | nu
       name: viewer.name,
       image: viewer.image,
       roles: o.roles,
+      roleId: invitedRole,
       lastSeenAt: new Date(),
     })
     .onConflictDoUpdate({
@@ -45,7 +52,7 @@ export async function syncViewer(db: Db, viewer: Viewer): Promise<ActiveOrg | nu
         name: viewer.name,
         image: viewer.image,
         roles: o.roles,
-        status: "active",
+        status: keepBlocked,
         lastSeenAt: new Date(),
         updatedAt: new Date(),
       },
@@ -77,14 +84,15 @@ export interface MemberSnapshot {
  * (list-org-members endpoint). Members missing from the snapshot are marked removed.
  */
 export async function reconcileMembers(db: Db, orgId: string, snapshot: MemberSnapshot[]) {
+  const invited = await invitedRoles(db, orgId);
   await db.transaction(async (tx) => {
     for (const m of snapshot) {
       await tx
         .insert(members)
-        .values({ orgId, ...m })
+        .values({ orgId, ...m, roleId: invited.get(m.email.toLowerCase()) ?? null })
         .onConflictDoUpdate({
           target: [members.orgId, members.userId],
-          set: { email: m.email, name: m.name, image: m.image, roles: m.roles, status: "active", updatedAt: new Date() },
+          set: { email: m.email, name: m.name, image: m.image, roles: m.roles, status: keepBlocked, updatedAt: new Date() },
         });
     }
     const keep = snapshot.map((m) => m.userId);

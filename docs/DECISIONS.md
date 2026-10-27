@@ -12,7 +12,8 @@
 | D8 | 2026-09-30 | Forge brand: Bricolage Grotesque / Geist / Geist Mono; Obsidian, Ash, Ember, Brass, Patina, Steel, Slag | Approved by the owner |
 | D9 | 2026-09-30 | Permissions checked by `resource:action`, never role names | Orgs reshape roles in SSO without code changes |
 | D10 | 2026-09-30 | Members removed via SSO webhook are blocked at once, even with a live session | Revocation shouldn't wait for token expiry |
-| D10a | 2026-10-28 | Webrizen SSO v2: no webhooks or app tokens. Permissions come from Operant's role keys (mapped in core), and members sync with the signed-in person's token on sign-in and refresh | v2 replaced per-app permissions and the Directory API with app roles and a management API; removals take effect within the 10-minute access token |
+| D10a | 2026-10-28 | Webrizen SSO v2: no webhooks or app tokens. Members sync with the signed-in person's token on sign-in and refresh | v2 replaced the Directory API and webhooks with a management API that acts as the person; removals take effect within the 10-minute access token |
+| D10b | 2026-10-28 | Roles live in Operant, per organization (Settings → Roles & access). Webrizen only says who is in the organization and who is an owner or admin; every member can open Operant, new people get the default role, and offboarding turns access off here (optionally removing them from the organization) | Businesses shape their own roles; one place to manage people; role edits apply on the next request |
 | D11 | 2026-09-30 | Deploy with Vercel's Build Output API (one bundled function + static SPA) | Workspace TypeScript packages bundle reliably with esbuild |
 | D12 | 2026-09-30 | UUID v7 ids generated in the app | Time-ordered ids; identical behaviour on both database engines |
 | D13 | 2026-09-30 | Employees are separate from sign-in accounts (`members`) and linked by work email | HR can add people before they sign in; some staff never need an account |

@@ -31,7 +31,10 @@ export interface Me {
     name: string;
     slug: string;
     logo: string | null;
+    /** "owner" or "admin" from Webrizen; empty for everyone else. */
     roles: string[];
+    /** Their Operant role; null for owners and admins, who can do everything. */
+    roleName: string | null;
     permissions: PermissionSet;
   };
   settings: {

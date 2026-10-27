@@ -32,7 +32,7 @@ export function OrgSettingsPage({ me }: { me: Me }) {
     <div className="mx-auto max-w-3xl space-y-6 p-6 sm:p-8">
       <PageHeader
         title="Organization"
-        description="Name, members and roles are managed in your Webrizen account. Everything else lives here."
+        description="Name and members are managed in your Webrizen account. Roles and everything else live here."
       />
 
       <Card className="p-6">

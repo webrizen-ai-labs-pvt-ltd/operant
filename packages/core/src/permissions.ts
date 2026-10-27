@@ -37,56 +37,25 @@ export function allPermissions(): PermissionSet {
   return out;
 }
 
-/**
- * What each of Operant's roles in Webrizen SSO can do (cloud). Webrizen sends the role keys;
- * the permissions live here. Organization owners and admins get everything.
- */
-export const WEBRIZEN_ROLE_PERMISSIONS: Record<string, PermissionSet> = {
-  partner: allPermissions(),
-  manager: {
-    employee: ["read"],
-    department: ["read"],
-    leave: ["read", "request", "approve"],
-    project: ["read", "create", "update", "archive"],
-    task: ["read", "create", "update", "assign", "delete"],
-    channel: ["read", "create", "manage"],
-    client: ["read"],
-    report: ["read_work"],
-  },
-  staff: {
-    employee: ["read"],
-    department: ["read"],
-    leave: ["read", "request"],
-    project: ["read"],
-    task: ["read", "create", "update"],
-    channel: ["read", "create"],
-  },
-  accounts: {
-    employee: ["read"],
-    client: ["read", "create", "update"],
-    invoice: ["read", "create", "update", "send", "void"],
-    payment: ["read", "record", "refund"],
-    report: ["read_finance"],
-  },
-  hr: {
-    employee: ["read", "create", "update", "archive"],
-    department: ["read", "manage"],
-    leave: ["read", "request", "approve"],
-    channel: ["read", "create"],
-    report: ["read_work"],
-  },
-};
+/** Organization owners and admins (from Webrizen, or the offline edition) can do everything. */
+export const isOrgAdminRole = (roles: readonly string[]) => roles.includes("owner") || roles.includes("admin");
 
-/** Permissions for a Webrizen organization role plus this app's roles (unknown roles add nothing). */
-export function permissionsForRoles(orgRole: string, appRoles: readonly string[]): PermissionSet {
-  if (orgRole === "owner" || orgRole === "admin") return allPermissions();
-  const out: Record<string, Set<string>> = {};
-  for (const role of appRoles) {
-    for (const [resource, actions] of Object.entries(WEBRIZEN_ROLE_PERMISSIONS[role] ?? {})) {
-      for (const a of actions ?? []) (out[resource] ??= new Set()).add(a);
-    }
+/** Keep only real resource/action pairs, so stored roles can't grant something that doesn't exist. */
+export function cleanPermissions(input: Record<string, readonly string[]>): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const [resource, actions] of Object.entries(PERMISSIONS)) {
+    const allowed = (input[resource] ?? []).filter((a) => (actions as readonly string[]).includes(a));
+    if (allowed.length) out[resource] = [...new Set(allowed)];
   }
-  return Object.fromEntries(Object.entries(out).map(([r, s]) => [r, [...s]]));
+  return out;
+}
+
+export interface StarterRole {
+  key: string;
+  name: string;
+  description: string;
+  permissions: PermissionSet;
+  isDefault?: boolean;
 }
 
 /** Built-in role presets for the offline edition's role editor. */
@@ -119,3 +88,22 @@ export const ROLE_PRESETS: Record<string, PermissionSet> = {
     report: ["read_finance"],
   },
 };
+
+/** Roles every new organization starts with. Each business can rename, change or delete them. */
+export const STARTER_ROLES: StarterRole[] = [
+  { key: "manager", name: "Manager", description: "Runs projects and approves the team's work and leave.", permissions: ROLE_PRESETS.manager! },
+  { key: "staff", name: "Staff", description: "Works on assigned tasks, logs time and requests leave.", permissions: ROLE_PRESETS.member!, isDefault: true },
+  { key: "accounts", name: "Accounts", description: "Invoices, payments and client billing.", permissions: ROLE_PRESETS.accountant! },
+  {
+    key: "hr",
+    name: "HR",
+    description: "Team records, departments, leave and attendance.",
+    permissions: {
+      employee: ["read", "create", "update", "archive"],
+      department: ["read", "manage"],
+      leave: ["read", "request", "approve"],
+      channel: ["read", "create"],
+      report: ["read_work"],
+    },
+  },
+];

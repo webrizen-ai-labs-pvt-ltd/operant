@@ -7,7 +7,7 @@ import {
   leaveRequests,
   members,
   onboardingRuns,
-  orgs,
+  roles,
   teamMembers,
   teams,
 } from "@operant/db";
@@ -20,6 +20,7 @@ import { audit } from "../../audit.ts";
 import type { AppEnv } from "../../context.ts";
 import { hasPermission, nextSequence, notFound, orgWorkSettings, viewerEmployee } from "../../helpers.ts";
 import { requirePermission } from "../../middleware.ts";
+import { defaultRole, ensureOrgRoles } from "../../roles.ts";
 import { likePattern, validate } from "../../validate.ts";
 
 const isoDate = z.string().refine(isIsoDate, "Use a valid date (YYYY-MM-DD)");
@@ -77,13 +78,13 @@ const baseColumns = {
   invitedAt: employees.invitedAt,
   /**
    * Can they sign in? "active" while they're an active member (linked, or with the same email and
-   * not signed in yet; someone removed in Webrizen can't), "invited" while an invitation is open
-   * (48 hours), "expired" after.
+   * not signed in yet; someone removed in Webrizen or turned off here can't), "invited" while an
+   * invitation is open (Webrizen invitations last 7 days), "expired" after.
    */
   signIn: sql<"active" | "invited" | "expired" | "none">`case
     when exists (select 1 from members m where m.org_id = "employees"."org_id" and m.status = 'active'
       and (m.id = "employees"."member_id" or lower(m.email) = lower("employees"."work_email"))) then 'active'
-    when "employees"."invited_at" > now() - interval '48 hours' then 'invited'
+    when "employees"."invited_at" > now() - interval '7 days' then 'invited'
     when "employees"."invited_at" is not null then 'expired'
     else 'none' end`,
 };
@@ -238,20 +239,20 @@ export const employeeRoutes = new Hono<AppEnv>()
     return c.json({ employee: me ? { id: me.id, fullName: me.fullName, managerId: me.managerId } : null });
   })
 
-  /** Roles someone can be invited with: Webrizen's roles for Operant, else the organization's roles in use. Never owner. */
+  /** Roles someone can be invited with: the organization's Operant roles (default first), and Admin. */
   .get("/employees/invite-roles", requirePermission("employee", "create"), async (c) => {
     const { db, directory } = c.get("deps");
-    const token = c.get("viewer")?.accessToken;
-    if (directory && token) {
-      const roles = await directory.roles(token).catch(() => null);
-      if (roles?.length) return c.json({ roles, available: true });
-    }
+    const org = c.get("org");
+    await ensureOrgRoles(db, org.id);
     const rows = await db
-      .selectDistinct({ role: sql<string>`unnest(${members.roles})` })
-      .from(members)
-      .where(and(eq(members.orgId, c.get("org").id), eq(members.status, "active")));
-    const roles = [...new Set(["member", "admin", ...rows.map((r) => r.role)])].filter((r) => r !== "owner");
-    return c.json({ roles, available: Boolean(c.get("deps").directory) });
+      .select({ id: roles.id, name: roles.name, isDefault: roles.isDefault })
+      .from(roles)
+      .where(eq(roles.orgId, org.id))
+      .orderBy(sql`${roles.isDefault} desc`, asc(roles.position));
+    return c.json({
+      roles: [...rows, { id: "admin", name: "Admin (everything, in every Webrizen app)", isDefault: false }],
+      available: Boolean(directory && c.get("viewer")?.accessToken),
+    });
   })
 
   .get("/org-chart", requirePermission("employee", "read"), async (c) => {
@@ -366,24 +367,47 @@ export const employeeRoutes = new Hono<AppEnv>()
   .post(
     "/employees/:id/offboard",
     requirePermission("employee", "archive"),
-    validate("json", z.object({ exitDate: isoDate })),
+    validate("json", z.object({ exitDate: isoDate, removeFromOrganization: z.boolean().default(false) })),
     async (c) => {
-      const { exitDate } = c.req.valid("json");
-      const { db } = c.get("deps");
+      const { exitDate, removeFromOrganization } = c.req.valid("json");
+      const { db, directory } = c.get("deps");
       const org = c.get("org");
       const id = c.req.param("id");
       const [row] = await db
         .update(employees)
         .set({ status: "offboarded", exitDate })
         .where(and(eq(employees.orgId, org.id), eq(employees.id, id)))
-        .returning({ id: employees.id });
+        .returning({ id: employees.id, memberId: employees.memberId, workEmail: employees.workEmail });
       if (!row) notFound("Employee not found");
+      // Turn off their Operant access at once. Owners and admins are managed in Webrizen.
+      const linked = or(
+        row.memberId ? eq(members.id, row.memberId) : sql`false`,
+        row.workEmail ? sql`lower(${members.email}) = lower(${row.workEmail})` : sql`false`,
+      );
+      const blocked = await db
+        .update(members)
+        .set({ status: "blocked", updatedAt: new Date() })
+        .where(and(eq(members.orgId, org.id), eq(members.status, "active"), linked, sql`not (${members.roles} && array['owner','admin']::text[])`))
+        .returning({ email: members.email });
+      // Optionally take them out of the Webrizen organization too (every app). Best effort.
+      let removal: { ok: boolean; message?: string } | null = null;
+      const email = row.workEmail ?? blocked[0]?.email;
+      if (removeFromOrganization && email) {
+        const accessToken = c.get("viewer")?.accessToken;
+        if (!directory || !accessToken) removal = { ok: false, message: "Webrizen sign-in isn't set up here." };
+        else {
+          const r = await directory.removeFromOrganization({ email, accessToken });
+          removal = r.ok
+            ? { ok: true }
+            : { ok: false, message: r.code === "not_allowed" ? "Only owners and admins in Webrizen can remove people from the organization." : r.message };
+        }
+      }
       // Their direct reports move up to the next manager.
       await db.execute(sql`
         update employees set manager_id = (select manager_id from employees where id = ${id})
         where org_id = ${org.id} and manager_id = ${id}`);
-      await audit(c, "employee.offboarded", { type: "employee", id }, { exitDate });
-      return c.json({ ok: true });
+      await audit(c, "employee.offboarded", { type: "employee", id }, { exitDate, accessTurnedOff: blocked.length > 0, removedFromOrganization: removal?.ok ?? false });
+      return c.json({ ok: true, accessTurnedOff: blocked.length > 0, removal });
     },
   )
 
@@ -391,11 +415,18 @@ export const employeeRoutes = new Hono<AppEnv>()
   .post(
     "/employees/:id/invite",
     requirePermission("employee", "create"),
-    validate("json", z.object({ role: z.string().trim().min(1).max(64).default("member") })),
+    /** role: one of the organization's role ids, "admin", or left out for the default role. */
+    validate("json", z.object({ role: z.union([z.uuid(), z.literal("admin")]).optional() })),
     async (c) => {
       const { db, directory } = c.get("deps");
       const org = c.get("org");
       const { role } = c.req.valid("json");
+      const admin = role === "admin";
+      const roleId = admin ? null : (role ?? (await defaultRole(db, org.id))?.id ?? null);
+      if (roleId) {
+        const [known] = await db.select({ id: roles.id }).from(roles).where(and(eq(roles.orgId, org.id), eq(roles.id, roleId)));
+        if (!known) throw new HTTPException(422, { message: "That role doesn't exist any more." });
+      }
       const [e] = await listQuery(db)
         .where(and(eq(employees.orgId, org.id), eq(employees.id, c.req.param("id"))))
         .limit(1);
@@ -406,21 +437,21 @@ export const employeeRoutes = new Hono<AppEnv>()
       const accessToken = c.get("viewer")?.accessToken;
       if (!directory || !accessToken) throw new HTTPException(501, { message: "Invitations need Webrizen sign-in, which isn't set up here." });
 
-      const result = await directory.invite({ email: e.workEmail, name: e.fullName, role, accessToken });
+      // Remember the role: it applies when they first open Operant.
+      await db.update(employees).set({ invitedRole: roleId }).where(eq(employees.id, e.id));
+      const result = await directory.invite({ email: e.workEmail, name: e.fullName, admin, accessToken });
       if (!result.ok) {
-        const status = result.code === "already_member" ? 409 : result.code === "not_allowed" || result.code === "not_a_member" ? 403 : result.code === "invalid_role" ? 422 : 502;
+        const status = result.code === "already_member" ? 409 : result.code === "not_allowed" || result.code === "not_a_member" ? 403 : 502;
         const message =
           result.code === "already_member"
             ? `${e.workEmail} is already in your Webrizen organization, so they can sign in now.`
             : status === 403
-              ? "Your Webrizen role doesn't allow inviting people. Ask an owner or admin."
-              : status === 422
-                ? result.message
-                : `Webrizen couldn't send the invitation: ${result.message}`;
+              ? "Only owners and admins in Webrizen can invite people. Ask one of them."
+              : `Webrizen couldn't send the invitation: ${result.message}`;
         throw new HTTPException(status as 403 | 409 | 422 | 502, { message });
       }
-      await db.update(employees).set({ invitedAt: new Date(), invitedRole: role }).where(eq(employees.id, e.id));
-      await audit(c, "employee.invited", { type: "employee", id: e.id }, { email: e.workEmail, role });
+      await db.update(employees).set({ invitedAt: new Date() }).where(eq(employees.id, e.id));
+      await audit(c, "employee.invited", { type: "employee", id: e.id }, { email: e.workEmail, role: role ?? "default" });
       return c.json({ invitedAt: new Date().toISOString(), expiresAt: result.expiresAt });
     },
   )

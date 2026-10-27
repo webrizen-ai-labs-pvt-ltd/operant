@@ -24,11 +24,14 @@ In **Admin → Products → Operant → Sign-in** (accounts.webrizen.com):
 | Redirect URLs | `https://app.<domain>/auth/callback` (add `http://localhost:5173/auth/callback` for development) |
 | After sign-out URLs | `https://app.<domain>/signed-out` |
 
-Copy the client ID and client secret (the secret is shown once). Operant's roles (partner, manager,
-staff, accounts, hr) live under **Roles**; what each role can do is mapped in
-`packages/core/src/permissions.ts` (`WEBRIZEN_ROLE_PERMISSIONS`). Organization owners and admins can
-do everything. The people directory syncs from Webrizen when people sign in and as their sessions
-refresh (every 10 minutes).
+Copy the client ID and client secret (the secret is shown once). Under **Details**, keep
+**The app manages its own roles** on: Webrizen only decides who is in an organization, and every
+member can open Operant.
+
+Roles live in Operant: each organization gets starter roles (Manager, Staff (default), Accounts,
+HR) and edits them under **Settings → Roles & access**, where it also gives each person a role or
+turns their access off. Organization owners and admins (from Webrizen) can do everything. The
+people directory syncs from Webrizen when people sign in and as their sessions refresh.
 
 ## 3. Vercel
 One Vercel project serves everything. `vercel.json` at the repo root defines four services and routes by hostname:

@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   FolderKanban,
+  KeyRound,
   LayoutDashboard,
   Mail,
   type LucideIcon,
@@ -95,6 +96,7 @@ export const MAIN_NAV: NavItem[] = [
 
 export const ADMIN_NAV: NavItem[] = [
   { to: "/settings", label: "Organization", icon: Building2, color: "var(--color-fg-quaternary)" },
+  { to: "/settings/roles", label: "Roles & access", icon: KeyRound, color: "var(--color-fg-quaternary)" },
   { to: "/settings/email", label: "Email", icon: Mail, color: "var(--color-fg-quaternary)" },
   { to: "/settings/audit", label: "Audit log", icon: ScrollText, color: "var(--color-fg-quaternary)" },
   { to: "/settings/preferences", label: "Preferences", icon: Settings, color: "var(--color-fg-quaternary)" },
@@ -111,6 +113,7 @@ export const SETTINGS_NAV: NavItem = {
   color: "var(--color-fg-quaternary)",
   children: [
     { to: "/settings", label: "Organization", exact: true },
+    { to: "/settings/roles", label: "Roles & access" },
     { to: "/settings/email", label: "Email" },
     { to: "/settings/audit", label: "Audit log" },
     { to: "/settings/preferences", label: "Preferences" },

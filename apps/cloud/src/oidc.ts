@@ -1,4 +1,4 @@
-import { permissionsForRoles, type ViewerOrg } from "@operant/core";
+import { allPermissions, type ViewerOrg } from "@operant/core";
 import * as client from "openid-client";
 import { z } from "zod";
 import { memberRoles } from "./directory.ts";
@@ -34,7 +34,7 @@ export function getConfig(env: Env) {
   return configPromise;
 }
 
-/** Webrizen SSO v2: the organization signed in to, and the person's roles in Operant. */
+/** Webrizen SSO v2: the organization signed in to, with the person's role in it. */
 const orgClaim = z
   .object({
     id: z.string(),
@@ -51,7 +51,6 @@ const identityClaims = z.object({
   name: z.string().optional(),
   picture: z.string().nullable().optional(),
   org: orgClaim,
-  roles: z.array(z.string()).default([]),
 });
 
 /** Map ID token / userinfo claims to our session shape. */
@@ -63,9 +62,11 @@ export function claimsToIdentity(raw: unknown): Pick<SessionData, "user" | "org"
         name: c.org.name,
         slug: c.org.slug,
         logo: null,
-        roles: memberRoles(c.org.role, c.roles),
-        // Owners and admins control everything in their organization; other roles map to permissions here.
-        permissions: permissionsForRoles(c.org.role, c.roles),
+        roles: memberRoles(c.org.role),
+        // Owners and admins control everything. Everyone else gets their Operant role's permissions,
+        // which live in our database and are resolved on each request (see requireOrg).
+        permissions: memberRoles(c.org.role).length ? allPermissions() : {},
+        useOrgRole: memberRoles(c.org.role).length === 0,
       }
     : null;
   return {

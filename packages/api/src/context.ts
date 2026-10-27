@@ -50,17 +50,16 @@ export interface PortalViewer {
   clientId: string | null;
 }
 
+type DirectoryResult<T = object> = ({ ok: true } & T) | { ok: false; code: string; message: string };
+
 /**
- * Invitations through the identity provider (Webrizen SSO), acting as the signed-in person
- * with their access token. Webrizen checks that they're an owner or admin.
+ * Who is in the organization, through the identity provider (Webrizen SSO), acting as the
+ * signed-in person with their access token. Webrizen checks that they're an owner or admin.
+ * Roles are Operant's own and never go to Webrizen.
  */
 export interface DirectoryInviter {
-  /** Roles someone can be invited with ("admin" plus the app's roles), default first. */
-  roles(accessToken: string): Promise<string[]>;
-  invite(input: {
-    email: string;
-    name?: string;
-    role: string;
-    accessToken: string;
-  }): Promise<{ ok: true; expiresAt: string } | { ok: false; code: string; message: string }>;
+  /** Email them an invitation to join the organization (as an organization admin when `admin`). */
+  invite(input: { email: string; name?: string; admin: boolean; accessToken: string }): Promise<DirectoryResult<{ expiresAt: string }>>;
+  /** Take them out of the organization, and so out of every Webrizen app it uses. */
+  removeFromOrganization(input: { email: string; accessToken: string }): Promise<DirectoryResult>;
 }
