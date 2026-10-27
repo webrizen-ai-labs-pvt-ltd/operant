@@ -77,11 +77,11 @@ function failure(err: unknown) {
 /** Invitations and removals through Webrizen, as the signed-in person. */
 export function webrizenInviter(env: Env): DirectoryInviter {
   return {
-    async invite({ email, name, admin, accessToken }) {
+    async invite({ email, name, accessToken }) {
       try {
         const result = await call(env, accessToken, "/v1/org/invitations", {
           method: "POST",
-          body: JSON.stringify({ email, name, roles: [], admin }),
+          body: JSON.stringify({ email, name, roles: [], admin: false }),
         });
         if (result.kind === "member_updated") {
           return { ok: false, code: "already_member", message: "They're already in the organization." };

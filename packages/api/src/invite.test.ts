@@ -40,12 +40,11 @@ beforeAll(async () => {
 afterAll(async () => t?.close());
 
 describe("inviting employees to sign in", () => {
-  it("offers the organization's own roles, default first, then Admin", async () => {
+  it("offers the organization's own roles, default first, and never Admin", async () => {
     const r = await inviteRoles();
     expect(r.available).toBe(true);
     expect(r.roles[0]).toMatchObject({ name: "Staff", isDefault: true });
-    expect(r.roles.map((x) => x.name)).toEqual(expect.arrayContaining(["Manager", "Accounts", "HR"]));
-    expect(r.roles.at(-1)?.id).toBe("admin");
+    expect(r.roles.map((x) => x.name).sort()).toEqual(["Accounts", "HR", "Manager", "Staff"]);
   });
 
   it("sends the invitation through Webrizen and remembers the Operant role", async () => {
@@ -55,15 +54,17 @@ describe("inviting employees to sign in", () => {
     const r = await t.call<{ expiresAt: string }>("hana", `/employees/${id}/invite`, { role: manager.id });
     expect(r.status).toBe(200);
     // Webrizen only hears who to invite; the role stays in Operant.
-    expect(sent.at(-1)).toEqual({ email: "ravi@acme.test", name: "Ravi Kumar", admin: false, accessToken: "hana-token" });
+    expect(sent.at(-1)).toEqual({ email: "ravi@acme.test", name: "Ravi Kumar", accessToken: "hana-token" });
     const after = await row(id);
     expect(after.signIn).toBe("invited");
     expect(after.invitedAt).toBeTruthy();
   });
 
-  it("invites as an organization admin when asked", async () => {
-    await t.call("hana", `/employees/${await add("Priya", "priya@acme.test")}/invite`, { role: "admin" });
-    expect(sent.at(-1)).toMatchObject({ email: "priya@acme.test", admin: true });
+  it("can't make anyone an organization admin", async () => {
+    const before = sent.length;
+    const r = await t.call("hana", `/employees/${await add("Priya", "priya@acme.test")}/invite`, { role: "admin" });
+    expect(r.status).toBe(400);
+    expect(sent.length).toBe(before);
   });
 
   it("needs a work email, a real role, and the right to add people", async () => {

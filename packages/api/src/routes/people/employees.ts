@@ -239,7 +239,10 @@ export const employeeRoutes = new Hono<AppEnv>()
     return c.json({ employee: me ? { id: me.id, fullName: me.fullName, managerId: me.managerId } : null });
   })
 
-  /** Roles someone can be invited with: the organization's Operant roles (default first), and Admin. */
+  /**
+   * Roles someone can be invited with: the organization's Operant roles, default first. Never
+   * an organization admin: that reaches every Webrizen app, so only Webrizen can grant it.
+   */
   .get("/employees/invite-roles", requirePermission("employee", "create"), async (c) => {
     const { db, directory } = c.get("deps");
     const org = c.get("org");
@@ -250,7 +253,7 @@ export const employeeRoutes = new Hono<AppEnv>()
       .where(eq(roles.orgId, org.id))
       .orderBy(sql`${roles.isDefault} desc`, asc(roles.position));
     return c.json({
-      roles: [...rows, { id: "admin", name: "Admin (everything, in every Webrizen app)", isDefault: false }],
+      roles: rows,
       available: Boolean(directory && c.get("viewer")?.accessToken),
     });
   })
@@ -415,14 +418,13 @@ export const employeeRoutes = new Hono<AppEnv>()
   .post(
     "/employees/:id/invite",
     requirePermission("employee", "create"),
-    /** role: one of the organization's role ids, "admin", or left out for the default role. */
-    validate("json", z.object({ role: z.union([z.uuid(), z.literal("admin")]).optional() })),
+    /** role: one of the organization's role ids, or left out for the default role. */
+    validate("json", z.object({ role: z.uuid().optional() })),
     async (c) => {
       const { db, directory } = c.get("deps");
       const org = c.get("org");
       const { role } = c.req.valid("json");
-      const admin = role === "admin";
-      const roleId = admin ? null : (role ?? (await defaultRole(db, org.id))?.id ?? null);
+      const roleId = role ?? (await defaultRole(db, org.id))?.id ?? null;
       if (roleId) {
         const [known] = await db.select({ id: roles.id }).from(roles).where(and(eq(roles.orgId, org.id), eq(roles.id, roleId)));
         if (!known) throw new HTTPException(422, { message: "That role doesn't exist any more." });
@@ -439,7 +441,7 @@ export const employeeRoutes = new Hono<AppEnv>()
 
       // Remember the role: it applies when they first open Operant.
       await db.update(employees).set({ invitedRole: roleId }).where(eq(employees.id, e.id));
-      const result = await directory.invite({ email: e.workEmail, name: e.fullName, admin, accessToken });
+      const result = await directory.invite({ email: e.workEmail, name: e.fullName, accessToken });
       if (!result.ok) {
         const status = result.code === "already_member" ? 409 : result.code === "not_allowed" || result.code === "not_a_member" ? 403 : 502;
         const message =

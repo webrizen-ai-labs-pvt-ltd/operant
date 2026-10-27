@@ -58,8 +58,8 @@ type DirectoryResult<T = object> = ({ ok: true } & T) | { ok: false; code: strin
  * Roles are Operant's own and never go to Webrizen.
  */
 export interface DirectoryInviter {
-  /** Email them an invitation to join the organization (as an organization admin when `admin`). */
-  invite(input: { email: string; name?: string; admin: boolean; accessToken: string }): Promise<DirectoryResult<{ expiresAt: string }>>;
+  /** Email them an invitation to join the organization as a member (never an admin: only Webrizen grants that). */
+  invite(input: { email: string; name?: string; accessToken: string }): Promise<DirectoryResult<{ expiresAt: string }>>;
   /** Take them out of the organization, and so out of every Webrizen app it uses. */
   removeFromOrganization(input: { email: string; accessToken: string }): Promise<DirectoryResult>;
 }

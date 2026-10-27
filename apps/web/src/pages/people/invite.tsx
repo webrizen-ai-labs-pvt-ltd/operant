@@ -41,7 +41,7 @@ export function InviteDialog({ employee, onClose }: { employee: Employee; onClos
       <DialogContent
         title={again ? `Send ${employee.fullName} a new invitation` : `Invite ${employee.fullName} to Operant`}
         icon={MailPlus}
-        description={`Webrizen emails an invitation to ${employee.workEmail}. They accept it, set up their Webrizen account (password, email code or Google), and can then sign in to Operant. Their profile here links to them automatically.`}
+        description={`Webrizen emails an invitation to ${employee.workEmail}. They accept it, set up their Webrizen account (email code, passkey or Google), and can then sign in to Operant. Their profile here links to them automatically.`}
         footer={
           <>
             <Button variant="ghost" onClick={onClose}>
