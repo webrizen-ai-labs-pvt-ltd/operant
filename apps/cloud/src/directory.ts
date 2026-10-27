@@ -81,7 +81,7 @@ export function webrizenInviter(env: Env): DirectoryInviter {
       try {
         const result = await call(env, accessToken, "/v1/org/invitations", {
           method: "POST",
-          body: JSON.stringify({ email, name, roles: [], admin: false }),
+          body: JSON.stringify({ email, name, roles: [] }),
         });
         if (result.kind === "member_updated") {
           return { ok: false, code: "already_member", message: "They're already in the organization." };
