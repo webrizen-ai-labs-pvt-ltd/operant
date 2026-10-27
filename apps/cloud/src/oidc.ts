@@ -1,10 +1,12 @@
-import { allPermissions, type ViewerOrg } from "@operant/core";
+import { permissionsForRoles, type ViewerOrg } from "@operant/core";
 import * as client from "openid-client";
 import { z } from "zod";
+import { memberRoles } from "./directory.ts";
 import type { Env } from "./env.ts";
 import type { SessionData } from "./session.ts";
 
-export const SCOPES = "openid profile email organization offline_access";
+/** members:manage lets Operant read the people directory and send invitations as the signed-in person. */
+export const SCOPES = "openid profile email organization offline_access members:manage";
 
 let configPromise: Promise<client.Configuration> | null = null;
 
@@ -32,14 +34,13 @@ export function getConfig(env: Env) {
   return configPromise;
 }
 
+/** Webrizen SSO v2: the organization signed in to, and the person's roles in Operant. */
 const orgClaim = z
   .object({
     id: z.string(),
     name: z.string(),
     slug: z.string(),
-    logo: z.string().nullable().optional(),
-    roles: z.array(z.string()).default([]),
-    permissions: z.record(z.string(), z.array(z.string())).default({}),
+    role: z.string(),
   })
   .nullable()
   .optional();
@@ -50,6 +51,7 @@ const identityClaims = z.object({
   name: z.string().optional(),
   picture: z.string().nullable().optional(),
   org: orgClaim,
+  roles: z.array(z.string()).default([]),
 });
 
 /** Map ID token / userinfo claims to our session shape. */
@@ -60,10 +62,10 @@ export function claimsToIdentity(raw: unknown): Pick<SessionData, "user" | "org"
         id: c.org.id,
         name: c.org.name,
         slug: c.org.slug,
-        logo: c.org.logo ?? null,
-        roles: c.org.roles,
-        // Owners control everything in their organization. Other roles get what Webrizen SSO grants.
-        permissions: c.org.roles.includes("owner") ? allPermissions() : c.org.permissions,
+        logo: null,
+        roles: memberRoles(c.org.role, c.roles),
+        // Owners and admins control everything in their organization; other roles map to permissions here.
+        permissions: permissionsForRoles(c.org.role, c.roles),
       }
     : null;
   return {

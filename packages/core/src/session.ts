@@ -7,6 +7,8 @@ export interface Viewer {
   name: string;
   image: string | null;
   org: ViewerOrg | null;
+  /** Cloud: the person's Webrizen access token, for calls Webrizen makes on their behalf. */
+  accessToken?: string;
 }
 
 export interface ViewerOrg {

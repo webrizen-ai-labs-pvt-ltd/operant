@@ -18,7 +18,8 @@ export async function syncViewer(db: Db, viewer: Viewer): Promise<ActiveOrg | nu
     .values({ externalId: o.id, name: o.name, slug: o.slug, logo: o.logo })
     .onConflictDoUpdate({
       target: orgs.externalId,
-      set: { name: o.name, slug: o.slug, logo: o.logo, updatedAt: new Date() },
+      // A null logo means the identity provider didn't send one: keep ours.
+      set: { name: o.name, slug: o.slug, logo: sql`coalesce(${o.logo}, ${orgs.logo})`, updatedAt: new Date() },
     })
     .returning({ id: orgs.id, name: orgs.name, slug: orgs.slug });
   if (!org) throw new Error("Failed to upsert org");

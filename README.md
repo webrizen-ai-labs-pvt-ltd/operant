@@ -25,7 +25,7 @@ Open http://localhost:5173.
 | Path | What it is |
 |---|---|
 | `apps/web` | React SPA: the whole product UI, used by both editions |
-| `apps/cloud` | Cloud edition server: Webrizen SSO login, sessions, webhooks, Supabase adapters |
+| `apps/cloud` | Cloud edition server: Webrizen SSO login, sessions, Supabase adapters |
 | `apps/desktop` | Offline edition (Electron), coming in Phase 5 |
 | `packages/api` | Edition-agnostic API (Hono) |
 | `packages/db` | Drizzle schema and SQL migrations (Supabase Postgres and PGlite) |

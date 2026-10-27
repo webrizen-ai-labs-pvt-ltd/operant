@@ -14,7 +14,6 @@ const schema = z.object({
   WEBRIZEN_SSO_ISSUER: z.url().default("https://accounts.webrizen.com/api/auth"),
   WEBRIZEN_SSO_CLIENT_ID: optional,
   WEBRIZEN_SSO_CLIENT_SECRET: optional,
-  WEBRIZEN_WEBHOOK_SECRET: optional,
 
   DATABASE_URL: optional,
   PGLITE_DIR: z.string().default(".data/pglite"),

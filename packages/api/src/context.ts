@@ -50,14 +50,17 @@ export interface PortalViewer {
   clientId: string | null;
 }
 
-/** Sends an invitation from the identity provider (Webrizen SSO) on behalf of a member. */
+/**
+ * Invitations through the identity provider (Webrizen SSO), acting as the signed-in person
+ * with their access token. Webrizen checks that they're an owner or admin.
+ */
 export interface DirectoryInviter {
+  /** Roles someone can be invited with ("admin" plus the app's roles), default first. */
+  roles(accessToken: string): Promise<string[]>;
   invite(input: {
-    /** The identity provider's organization id (orgs.externalId). */
-    organizationId: string;
     email: string;
+    name?: string;
     role: string;
-    /** The signed-in person asking for it; they must be allowed to invite. */
-    inviterUserId: string;
+    accessToken: string;
   }): Promise<{ ok: true; expiresAt: string } | { ok: false; code: string; message: string }>;
 }

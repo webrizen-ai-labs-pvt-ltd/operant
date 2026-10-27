@@ -5,13 +5,16 @@ import { createTestApi, viewer } from "./test-utils.ts";
 
 /* Acme: Hana (owner), Mo (member, can't add people). */
 const viewers = {
-  hana: viewer("hana", "acme", ["owner"], allPermissions()),
-  mo: viewer("mo", "acme", ["member"], ROLE_PRESETS.member!),
+  hana: { ...viewer("hana", "acme", ["owner"], allPermissions()), accessToken: "hana-token" },
+  mo: { ...viewer("mo", "acme", ["member"], ROLE_PRESETS.member!), accessToken: "mo-token" },
 };
 
 // A stand-in for Webrizen: records invitations, and answers like the real API for a few addresses.
 const sent: Parameters<DirectoryInviter["invite"]>[0][] = [];
 const directory: DirectoryInviter = {
+  async roles() {
+    return ["staff", "manager", "admin"];
+  },
   async invite(input) {
     sent.push(input);
     if (input.email === "taken@acme.test") return { ok: false, code: "already_member", message: "Already a member" };
@@ -40,7 +43,7 @@ describe("inviting employees to sign in", () => {
     expect((await row(id)).signIn).toBe("none");
     const r = await t.call<{ expiresAt: string }>("hana", `/employees/${id}/invite`, { role: "member" });
     expect(r.status).toBe(200);
-    expect(sent.at(-1)).toEqual({ organizationId: "acme", email: "ravi@acme.test", role: "member", inviterUserId: "hana" });
+    expect(sent.at(-1)).toEqual({ email: "ravi@acme.test", name: "Ravi Kumar", role: "member", accessToken: "hana-token" });
     const after = await row(id);
     expect(after.signIn).toBe("invited");
     expect(after.invitedAt).toBeTruthy();
@@ -75,10 +78,9 @@ describe("inviting employees to sign in", () => {
     expect(bad.status).toBe(422);
   });
 
-  it("offers the organization's roles, never owner", async () => {
+  it("offers Webrizen's roles for Operant, default first, never owner", async () => {
     const r = await t.call<{ roles: string[]; available: boolean }>("hana", "/employees/invite-roles");
     expect(r.json.available).toBe(true);
-    expect(r.json.roles).toContain("member");
-    expect(r.json.roles).not.toContain("owner");
+    expect(r.json.roles).toEqual(["staff", "manager", "admin"]);
   });
 });

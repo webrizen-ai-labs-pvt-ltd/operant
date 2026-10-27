@@ -13,15 +13,12 @@ import {
   syncViewer,
 } from "@operant/api";
 import { allPermissions, type FileStore, type Realtime, type Viewer } from "@operant/core";
-import { connectPglite, connectPostgres, type Db, members, migrationsFolder, webhookReceipts } from "@operant/db";
-import { and, eq } from "drizzle-orm";
+import { connectPglite, connectPostgres, type Db, migrationsFolder } from "@operant/db";
 import { Hono } from "hono";
 import { csrf } from "hono/csrf";
 import { secureHeaders } from "hono/secure-headers";
 import * as client from "openid-client";
-import { Webhook } from "standardwebhooks";
-import { z } from "zod";
-import { directoryMember, directoryOrg, listAllMembers, toSnapshot, webrizenInviter } from "./directory.ts";
+import { listAllMembers, webrizenInviter } from "./directory.ts";
 import type { Env } from "./env.ts";
 import { getConfig, identityFromTokens, refreshSession, SCOPES, safeReturnTo, tokensToSession } from "./oidc.ts";
 import {
@@ -43,7 +40,7 @@ interface LoginTx {
 }
 
 function toViewer(s: SessionData): Viewer {
-  return { userId: s.user.id, email: s.user.email, name: s.user.name, image: s.user.image, org: s.org };
+  return { userId: s.user.id, email: s.user.email, name: s.user.name, image: s.user.image, org: s.org, accessToken: s.accessToken };
 }
 
 async function connectDb(env: Env): Promise<Db> {
@@ -126,7 +123,8 @@ export async function createCloudApp(env: Env) {
       if (renewed) {
         session = renewed;
         await writeSession(c, renewed, key, secure);
-        await syncViewer(db, toViewer(renewed));
+        const org = await syncViewer(db, toViewer(renewed));
+        if (org && renewed.accessToken) void syncOrgMembers(env, db, org.id, renewed.accessToken);
       } else {
         session = null;
         clearSession(c);
@@ -158,8 +156,8 @@ export async function createCloudApp(env: Env) {
       state,
     };
     const prompt = c.req.query("prompt");
-    // Webrizen SSO supports "login" and "create". Its org picker appears on every sign-in for multi-org users.
-    if (prompt === "login" || prompt === "create") params.prompt = prompt;
+    // "select_account" opens Webrizen's organization picker (switch organization).
+    if (prompt === "login" || prompt === "create" || prompt === "select_account") params.prompt = prompt;
     return c.redirect(client.buildAuthorizationUrl(config, params).href);
   });
 
@@ -177,8 +175,8 @@ export async function createCloudApp(env: Env) {
       const session = tokensToSession(tokens, await identityFromTokens(config, tokens, ""));
       await writeSession(c, session, key, secure);
       const org = await syncViewer(db, toViewer(session));
-      // Best effort: bring the people directory up to date (the nightly job covers misses).
-      if (org && session.org) void syncOrgMembers(env, db, org.id, session.org.id);
+      // Best effort: bring the people directory up to date (token refreshes keep it current).
+      if (org && session.accessToken) void syncOrgMembers(env, db, org.id, session.accessToken);
       return c.redirect(tx.returnTo);
     } catch (err) {
       console.error("Login callback failed", err);
@@ -233,78 +231,12 @@ export async function createCloudApp(env: Env) {
     return c.json({ enabled: true, url: env.SUPABASE_URL, publishableKey: env.SUPABASE_PUBLISHABLE_KEY, token, expiresIn, orgId: org.id });
   });
 
-  /* ---------------- Webrizen SSO webhooks ---------------- */
-
-  const webhookEvent = z.object({
-    type: z.string(),
-    data: z.object({
-      organization: directoryOrg,
-      member: directoryMember.partial({ roles: true }).optional(),
-    }),
-  });
-
-  app.post("/webhooks/webrizen", async (c) => {
-    if (!env.WEBRIZEN_WEBHOOK_SECRET) return c.text("Webhooks not configured", 503);
-    const body = await c.req.text();
-    let event: z.infer<typeof webhookEvent>;
-    try {
-      const verified = new Webhook(env.WEBRIZEN_WEBHOOK_SECRET).verify(body, {
-        "webhook-id": c.req.header("webhook-id") ?? "",
-        "webhook-timestamp": c.req.header("webhook-timestamp") ?? "",
-        "webhook-signature": c.req.header("webhook-signature") ?? "",
-      });
-      event = webhookEvent.parse(verified);
-    } catch {
-      return c.text("Invalid signature", 401);
-    }
-
-    const messageId = c.req.header("webhook-id")!;
-    const inserted = await db
-      .insert(webhookReceipts)
-      .values({ id: messageId, source: "webrizen", type: event.type })
-      .onConflictDoNothing()
-      .returning({ id: webhookReceipts.id });
-    if (inserted.length === 0) return c.body(null, 204); // duplicate delivery
-
-    const org = await findOrg(db, event.data.organization.id);
-    if (!org) return c.body(null, 204); // an org that hasn't used Operant yet
-
-    const member = event.data.member;
-    switch (event.type) {
-      case "member.added":
-      case "member.updated":
-        if (member) await reconcileOne(db, org.id, toSnapshot({ ...member, roles: member.roles ?? [] }));
-        break;
-      case "member.removed":
-        if (member) {
-          await db
-            .update(members)
-            .set({ status: "removed", updatedAt: new Date() })
-            .where(and(eq(members.orgId, org.id), eq(members.userId, member.user_id)));
-        }
-        break;
-      case "role.updated":
-      case "role.deleted":
-        // One event for many members: re-sync the whole org in the background.
-        queueMicrotask(() => void syncOrgMembers(env, db, org.id, event.data.organization.id));
-        break;
-    }
-    return c.body(null, 204);
-  });
-
   /* ---------------- Scheduled jobs ---------------- */
 
-  app.post("/api/cron/sync-members", async (c) => {
+  // Webrizen SSO v2 has no app-level directory access: members sync on sign-in and token refresh instead.
+  app.post("/api/cron/sync-members", (c) => {
     if (!env.CRON_SECRET || c.req.header("authorization") !== `Bearer ${env.CRON_SECRET}`) return c.text("Forbidden", 403);
-    if (!env.ssoConfigured) return c.json({ skipped: true });
-    const rows = await db.query.orgs.findMany({ columns: { id: true, externalId: true } });
-    let synced = 0;
-    for (const o of rows) {
-      if (!o.externalId) continue;
-      await syncOrgMembers(env, db, o.id, o.externalId);
-      synced++;
-    }
-    return c.json({ synced });
+    return c.json({ skipped: true });
   });
 
   app.post("/api/cron/finance", async (c) => {
@@ -320,21 +252,18 @@ export async function createCloudApp(env: Env) {
   return app;
 }
 
-async function reconcileOne(db: Db, orgId: string, m: ReturnType<typeof toSnapshot>) {
-  await db
-    .insert(members)
-    .values({ orgId, ...m })
-    .onConflictDoUpdate({
-      target: [members.orgId, members.userId],
-      set: { email: m.email, name: m.name, image: m.image, roles: m.roles, status: "active", updatedAt: new Date() },
-    });
-}
+/** Last member sync per org in this instance: token refreshes come every few minutes per person. */
+const lastSync = new Map<string, number>();
+const SYNC_EVERY_MS = 5 * 60_000;
 
-async function syncOrgMembers(env: Env, db: Db, orgId: string, externalOrgId: string) {
+async function syncOrgMembers(env: Env, db: Db, orgId: string, accessToken: string) {
+  const last = lastSync.get(orgId) ?? 0;
+  if (Date.now() - last < SYNC_EVERY_MS) return;
+  lastSync.set(orgId, Date.now());
   try {
-    const { members: snapshot } = await listAllMembers(env, externalOrgId);
-    await reconcileMembers(db, orgId, snapshot);
+    await reconcileMembers(db, orgId, await listAllMembers(env, accessToken));
   } catch (err) {
+    lastSync.delete(orgId);
     console.error(`Member sync failed for org ${orgId}`, err);
   }
 }

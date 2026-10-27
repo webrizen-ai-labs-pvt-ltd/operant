@@ -238,9 +238,14 @@ export const employeeRoutes = new Hono<AppEnv>()
     return c.json({ employee: me ? { id: me.id, fullName: me.fullName, managerId: me.managerId } : null });
   })
 
-  /** Roles someone can be invited with: the organization's roles in use, never owner. */
+  /** Roles someone can be invited with: Webrizen's roles for Operant, else the organization's roles in use. Never owner. */
   .get("/employees/invite-roles", requirePermission("employee", "create"), async (c) => {
-    const { db } = c.get("deps");
+    const { db, directory } = c.get("deps");
+    const token = c.get("viewer")?.accessToken;
+    if (directory && token) {
+      const roles = await directory.roles(token).catch(() => null);
+      if (roles?.length) return c.json({ roles, available: true });
+    }
     const rows = await db
       .selectDistinct({ role: sql<string>`unnest(${members.roles})` })
       .from(members)
@@ -398,11 +403,10 @@ export const employeeRoutes = new Hono<AppEnv>()
       if (!e.workEmail) throw new HTTPException(422, { message: "Add their work email first. The invitation goes there." });
       if (e.signIn === "active") throw new HTTPException(409, { message: `${e.fullName} can already sign in.` });
       if (e.status === "offboarded") throw new HTTPException(409, { message: "This person has been offboarded." });
-      if (!directory) throw new HTTPException(501, { message: "Invitations need Webrizen sign-in, which isn't set up here." });
+      const accessToken = c.get("viewer")?.accessToken;
+      if (!directory || !accessToken) throw new HTTPException(501, { message: "Invitations need Webrizen sign-in, which isn't set up here." });
 
-      const [o] = await db.select({ externalId: orgs.externalId }).from(orgs).where(eq(orgs.id, org.id));
-      if (!o?.externalId) throw new HTTPException(501, { message: "This organization isn't connected to Webrizen." });
-      const result = await directory.invite({ organizationId: o.externalId, email: e.workEmail, role, inviterUserId: c.get("viewer")!.userId });
+      const result = await directory.invite({ email: e.workEmail, name: e.fullName, role, accessToken });
       if (!result.ok) {
         const status = result.code === "already_member" ? 409 : result.code === "not_allowed" || result.code === "not_a_member" ? 403 : result.code === "invalid_role" ? 422 : 502;
         const message =

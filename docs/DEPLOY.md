@@ -17,17 +17,18 @@ One Vercel project serves both the SPA and the API from the same domain (current
    - under JWT settings, copy the **JWT secret**
 
 ## 2. Webrizen SSO
-In **Platform → Applications → Register application**:
+In **Admin → Products → Operant → Sign-in** (accounts.webrizen.com):
 
 | Field | Value |
 |---|---|
-| Redirect URI | `https://<domain>/auth/callback` (add `http://localhost:5173/auth/callback` for development) |
-| Sign-out redirect URI | `https://<domain>/signed-out` |
-| Directory API | **On** (needed for the people directory) |
-| Webhook endpoint | `https://<domain>/webhooks/webrizen`, events: `member.*`, `role.*`, `organization.deleted` |
-| Permission resources | the catalogue in `packages/core/src/permissions.ts` (also in PLAN.md §5.4) |
+| Redirect URLs | `https://app.<domain>/auth/callback` (add `http://localhost:5173/auth/callback` for development) |
+| After sign-out URLs | `https://app.<domain>/signed-out` |
 
-Copy the client ID, client secret and webhook signing secret.
+Copy the client ID and client secret (the secret is shown once). Operant's roles (partner, manager,
+staff, accounts, hr) live under **Roles**; what each role can do is mapped in
+`packages/core/src/permissions.ts` (`WEBRIZEN_ROLE_PERMISSIONS`). Organization owners and admins can
+do everything. The people directory syncs from Webrizen when people sign in and as their sessions
+refresh (every 10 minutes).
 
 ## 3. Vercel
 One Vercel project serves everything. `vercel.json` at the repo root defines four services and routes by hostname:
@@ -48,7 +49,6 @@ One Vercel project serves everything. `vercel.json` at the repo root defines fou
    | `PORTAL_URL` | `https://portal.<domain>` |
    | `SESSION_SECRET` | 32+ random characters (`openssl rand -base64 32`) |
    | `WEBRIZEN_SSO_CLIENT_ID` / `WEBRIZEN_SSO_CLIENT_SECRET` | from SSO |
-   | `WEBRIZEN_WEBHOOK_SECRET` | from SSO (`whsec_…`) |
    | `DATABASE_URL` | Supabase **transaction pooler** URL |
    | `SUPABASE_URL` / `SUPABASE_SECRET_KEY` / `SUPABASE_JWT_SECRET` / `SUPABASE_PUBLISHABLE_KEY` | from Supabase (the publishable key lets browsers connect to Realtime) |
    | `RESEND_API_KEY` / `EMAIL_FROM` | from Resend, for emails and for organizations' own sending domains (optional) |

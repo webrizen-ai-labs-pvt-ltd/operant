@@ -37,6 +37,58 @@ export function allPermissions(): PermissionSet {
   return out;
 }
 
+/**
+ * What each of Operant's roles in Webrizen SSO can do (cloud). Webrizen sends the role keys;
+ * the permissions live here. Organization owners and admins get everything.
+ */
+export const WEBRIZEN_ROLE_PERMISSIONS: Record<string, PermissionSet> = {
+  partner: allPermissions(),
+  manager: {
+    employee: ["read"],
+    department: ["read"],
+    leave: ["read", "request", "approve"],
+    project: ["read", "create", "update", "archive"],
+    task: ["read", "create", "update", "assign", "delete"],
+    channel: ["read", "create", "manage"],
+    client: ["read"],
+    report: ["read_work"],
+  },
+  staff: {
+    employee: ["read"],
+    department: ["read"],
+    leave: ["read", "request"],
+    project: ["read"],
+    task: ["read", "create", "update"],
+    channel: ["read", "create"],
+  },
+  accounts: {
+    employee: ["read"],
+    client: ["read", "create", "update"],
+    invoice: ["read", "create", "update", "send", "void"],
+    payment: ["read", "record", "refund"],
+    report: ["read_finance"],
+  },
+  hr: {
+    employee: ["read", "create", "update", "archive"],
+    department: ["read", "manage"],
+    leave: ["read", "request", "approve"],
+    channel: ["read", "create"],
+    report: ["read_work"],
+  },
+};
+
+/** Permissions for a Webrizen organization role plus this app's roles (unknown roles add nothing). */
+export function permissionsForRoles(orgRole: string, appRoles: readonly string[]): PermissionSet {
+  if (orgRole === "owner" || orgRole === "admin") return allPermissions();
+  const out: Record<string, Set<string>> = {};
+  for (const role of appRoles) {
+    for (const [resource, actions] of Object.entries(WEBRIZEN_ROLE_PERMISSIONS[role] ?? {})) {
+      for (const a of actions ?? []) (out[resource] ??= new Set()).add(a);
+    }
+  }
+  return Object.fromEntries(Object.entries(out).map(([r, s]) => [r, [...s]]));
+}
+
 /** Built-in role presets for the offline edition's role editor. */
 export const ROLE_PRESETS: Record<string, PermissionSet> = {
   owner: allPermissions(),

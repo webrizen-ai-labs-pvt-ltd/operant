@@ -24,7 +24,10 @@ export function SignInBadge({ e }: { e: Pick<Employee, "signIn" | "workEmail" | 
 
 export function InviteDialog({ employee, onClose }: { employee: Employee; onClose: () => void }) {
   const { data } = useQuery({ queryKey: ["invite-roles"], queryFn: () => api<{ roles: string[]; available: boolean }>("employees/invite-roles"), staleTime: 60_000 });
-  const [role, setRole] = useState("member");
+  const [picked, setPicked] = useState<string | null>(null);
+  // Webrizen lists its default role first; offline/legacy lists start with "member".
+  const role = picked ?? data?.roles[0] ?? "member";
+  const setRole = setPicked;
   const invite = useApiMutation(() => api(`employees/${employee.id}/invite`, { method: "POST", body: JSON.stringify({ role }) }), {
     invalidate: [...PEOPLE_KEYS, "employee"],
     success: `Invitation sent to ${employee.workEmail}`,
